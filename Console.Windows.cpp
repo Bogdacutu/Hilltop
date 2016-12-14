@@ -9,7 +9,7 @@ void ConsoleBuffer::commit() {
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
             const unsigned int idx = i * width + j;
-            data[idx].Char.AsciiChar = buffer[idx].ch;
+            data[idx].Char.UnicodeChar = buffer[idx].ch;
             data[idx].Attributes = buffer[idx].color;
         }
     }

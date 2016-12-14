@@ -6,10 +6,10 @@
 
 using namespace Hilltop::Console;
 
-const int width = 300;
-const int height = 130 / 2;
+int width = 178;
+int height = 130;
 
-BufferedConsole console(width, height);
+BufferedConsole console(width, (height + 1) / 2);
 
 void setConsoleFontSize(HANDLE buffer, unsigned short size) {
     CONSOLE_FONT_INFOEX info = { sizeof(info) };
@@ -42,7 +42,7 @@ void printString(std::string str, unsigned short x, unsigned short y) {
 
 bool resizeWithAutoFont(HANDLE buffer, unsigned short width, unsigned short height, unsigned short minFont) {
     unsigned short w = 0, h = 0;
-    for (unsigned short i = 10; i >= minFont; i--) {
+    for (unsigned short i = 72; i >= minFont; i--) {
         setConsoleFontSize(buffer, i);
         setConsoleSize(buffer, width, height);
         getConsoleSize(buffer, &w, &h);
@@ -79,12 +79,14 @@ int main() {
 
     ConsoleColor color = RED;
 
-    if (!resizeWithAutoFont(GetStdHandle(STD_OUTPUT_HANDLE), width, height, 4))
+    if (!resizeWithAutoFont(GetStdHandle(STD_OUTPUT_HANDLE), width, (height + 1) / 2, 2))
         abort();
 
     DWORD lastTicks = GetTickCount();
 
     RollingAverage frametime(25);
+
+    DoublePixelConsoleBuffer buffer(width, height);
 
     while (true) {
         for (int i = 0; i < width; i++) {
@@ -92,18 +94,11 @@ int main() {
                 const int f = 1;
                 if (!((i < width / f && j < height / f) || (i >= (width - width / f) && j >= (height - height / f))))
                     continue;
-                ConsoleColor c = make_fg_color((ConsoleColor)(color + i + j / 5));
-                console.set(j, i, ' ', make_bg_color(c), BACKGROUND_COLOR);
-                char ch = '0' + c % 16;
-                if (ch > '9') ch = ch - '9' - 1 + 'a';
-                if (j == 0)
-                    console.set(j, i, ch, make_fg_color((ConsoleColor)~c), FOREGROUND_COLOR);
-                else if ((color + i + j / 5) % 4 == 2)
-                    console.set(j, i, ':', make_fg_color((ConsoleColor)~c), FOREGROUND_COLOR);
-                else if ((color + i + j / 5) % 4 == 3)
-                    console.set(j, i, ')', make_fg_color((ConsoleColor)~c), FOREGROUND_COLOR);
+                buffer.set(j, i, make_fg_color((ConsoleColor)(color + i + j / 3)));
             }
         }
+
+        buffer.commit(console, 0, 0);
 
         DWORD ticks = timeGetTime();
         DWORD time = ticks - lastTicks;

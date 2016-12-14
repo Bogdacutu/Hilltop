@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 
 namespace Hilltop {
@@ -40,7 +41,7 @@ namespace Hilltop {
         class ConsoleBuffer {
         private:
             typedef struct {
-                char ch;
+                wchar_t ch;
                 uint8_t color;
             } pixel_t;
 
@@ -51,7 +52,7 @@ namespace Hilltop {
 
             ConsoleBuffer(unsigned short width, unsigned short height);
 
-            void set(unsigned short x, unsigned short y, char ch, ConsoleColor color,
+            void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color,
                 ConsoleColorType colorMask = (ConsoleColorType)(BACKGROUND_COLOR | FOREGROUND_COLOR));
             void clear(ConsoleColor color);
 
@@ -59,5 +60,25 @@ namespace Hilltop {
         };
 
         typedef ConsoleBuffer BufferedConsole;
+
+        
+        class DoublePixelConsoleBuffer {
+        private:
+            std::vector<uint8_t> buffer;
+
+            const uint8_t BIT_MASKS[2] = { 0xf0, 0xf };
+            const int BIT_SHIFTS[2] = { 4, 0 };
+
+        public:
+            const unsigned short width, height;
+
+            DoublePixelConsoleBuffer(unsigned short width, unsigned short height);
+
+            ConsoleColor get(unsigned short x, unsigned short y);
+            void set(unsigned short x, unsigned short y, ConsoleColor color);
+            void clear(ConsoleColor color);
+
+            void commit(ConsoleBuffer &buffer, unsigned int x, unsigned int y);
+        };
     }
 }
