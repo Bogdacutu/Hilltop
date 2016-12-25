@@ -78,7 +78,7 @@ namespace Hilltop {
             void set(unsigned short x, unsigned short y, ConsoleColor color);
             void clear(ConsoleColor color);
 
-            void commit(ConsoleBuffer &buffer, unsigned int x, unsigned int y);
+            void commit(ConsoleBuffer &buffer, unsigned int x = 0, unsigned int y = 0);
         };
     }
 }

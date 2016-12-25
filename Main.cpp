@@ -1,4 +1,5 @@
-﻿#include <iostream>
+﻿#include "bitmap_image.hpp"
+#include <iostream>
 #include <Windows.h>
 #include "Console.h"
 #include <sstream>
@@ -88,7 +89,7 @@ int main() {
 
     DoublePixelConsoleBuffer buffer(width, height);
 
-    while (true) {
+    /*while (true) {
         for (int i = 0; i < width; i++) {
             for (int j = 0; j < height; j++) {
                 const int f = 1;
@@ -98,7 +99,7 @@ int main() {
             }
         }
 
-        buffer.commit(console, 0, 0);
+        buffer.commit(console);
 
         DWORD ticks = timeGetTime();
         DWORD time = ticks - lastTicks;
@@ -118,5 +119,45 @@ int main() {
         color = make_fg_color((ConsoleColor)(color + 1));
 
         Sleep(1);
+    }*/
+
+    bitmap_image image("map.bmp");
+
+    for (unsigned short i = 0; i < image.height(); i++) {
+        for (unsigned short j = 0; j < image.width(); j++) {
+            rgb_t p;
+            image.get_pixel(j, i, p);
+            if (p.green >= 128) {
+                buffer.set(i, j, GREEN);
+            }
+        }
+    }
+
+    buffer.commit(console);
+    console.commit();
+
+    int it = 0;
+    int pos = 0;
+    int rep = 0;
+    int off = 0;
+
+    while (true) {
+        for (int i = 0; i < 5; i++) {
+            int x = sin(it++ / 10.) * 10 + 14;
+            if (x == 14) rep++;
+            if (rep == 4) {
+                rep = 0;
+                off++;
+            }
+            buffer.set(x + off, pos, off % 2 == 0 ? RED : BLUE);
+            //buffer.set(x + off + 50, pos, RED);
+            //buffer.set(x + off + 100, pos, RED);
+            pos = (pos + 1) % width;
+        }
+
+        buffer.commit(console);
+        console.commit();
+
+        //Sleep(1);
     }
 }
