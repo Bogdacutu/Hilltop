@@ -36,33 +36,59 @@ namespace Hilltop {
         ConsoleColor make_color(ConsoleColor background, ConsoleColor foreground);
         ConsoleColor make_bg_color(ConsoleColor background);
         ConsoleColor make_fg_color(ConsoleColor foreground);
+		ConsoleColor calc_masked_color(ConsoleColor old, ConsoleColor color, ConsoleColorType mask);
 
 
-        class ConsoleBuffer {
-        private:
-            typedef struct {
-                wchar_t ch;
-                uint8_t color;
-            } pixel_t;
+		class Console {
+		protected:
+			Console(unsigned short width, unsigned short height);
 
-            std::vector<pixel_t> buffer;
+		public:
+			const unsigned short width, height;
 
-        public:
-            const unsigned short width, height;
+			virtual ~Console() {}
 
-            ConsoleBuffer(unsigned short width, unsigned short height);
+			virtual void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color,
+				ConsoleColorType colorMask = (ConsoleColorType)(BACKGROUND_COLOR | FOREGROUND_COLOR)) = 0;
+			virtual void clear(ConsoleColor color);
 
-            void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color,
-                ConsoleColorType colorMask = (ConsoleColorType)(BACKGROUND_COLOR | FOREGROUND_COLOR));
-            void clear(ConsoleColor color);
+			virtual void commit() const {}
+		};
 
-            void commit();
-        };
 
-        typedef ConsoleBuffer BufferedConsole;
+		class BufferedConsole : public Console {
+		protected:
+			BufferedConsole(unsigned short width, unsigned short height);
+
+		public:
+			typedef struct {
+				wchar_t ch;
+				ConsoleColor color;
+			} pixel_t;
+
+			virtual pixel_t get(unsigned short x, unsigned short y) const = 0;
+		};
+
+
+		class BufferedConsoleRegion final : public BufferedConsole {
+		private:
+			bool enforceBounds = true;
+			std::shared_ptr<BufferedConsole> console;
+			unsigned short x, y;
+
+		public:
+			BufferedConsoleRegion(std::shared_ptr<BufferedConsole> console, unsigned short width, unsigned short height, unsigned short x, unsigned short y);
+
+			virtual pixel_t get(unsigned short x, unsigned short y) const override;
+			virtual void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color,
+				ConsoleColorType colorMask = (ConsoleColorType)(BACKGROUND_COLOR | FOREGROUND_COLOR)) override;
+
+			bool enforcingBounds() const;
+			void setEnforceBounds(bool value);
+		};
 
         
-        class DoublePixelConsoleBuffer {
+        class DoublePixelBufferedConsole {
         private:
             std::vector<uint8_t> buffer;
 
@@ -72,13 +98,13 @@ namespace Hilltop {
         public:
             const unsigned short width, height;
 
-            DoublePixelConsoleBuffer(unsigned short width, unsigned short height);
+			DoublePixelBufferedConsole(unsigned short width, unsigned short height);
 
-            ConsoleColor get(unsigned short x, unsigned short y);
+            ConsoleColor get(unsigned short x, unsigned short y) const;
             void set(unsigned short x, unsigned short y, ConsoleColor color);
             void clear(ConsoleColor color);
 
-            void commit(ConsoleBuffer &buffer, unsigned int x, unsigned int y);
+            void commit(Console &buffer) const;
         };
     }
 }

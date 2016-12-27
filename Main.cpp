@@ -1,55 +1,21 @@
 ﻿#include <iostream>
 #include <Windows.h>
 #include "Console.h"
+#include "Console.Windows.h"
 #include <sstream>
 #include <deque>
 
 using namespace Hilltop::Console;
 
-int width = 178;
-int height = 130;
+unsigned short width = 178;
+unsigned short height = 130;
 
-BufferedConsole console(width, (height + 1) / 2);
-
-void setConsoleFontSize(HANDLE buffer, unsigned short size) {
-    CONSOLE_FONT_INFOEX info = { sizeof(info) };
-    GetCurrentConsoleFontEx(buffer, FALSE, &info);
-    info.dwFontSize.X = size;
-    info.dwFontSize.Y = size * 2;
-    SetCurrentConsoleFontEx(buffer, FALSE, &info);
-}
-
-void setConsoleSize(HANDLE buffer, unsigned short width, unsigned short height) {
-    CONSOLE_SCREEN_BUFFER_INFO info;
-    GetConsoleScreenBufferInfo(buffer, &info);
-    SetConsoleScreenBufferSize(buffer, { max(info.dwSize.X, width), max(info.dwSize.Y, height) });
-    SMALL_RECT finalArea = { 0, 0, (SHORT)width - 1, (SHORT)height - 1 };
-    SetConsoleWindowInfo(buffer, TRUE, &finalArea);
-    SetConsoleScreenBufferSize(buffer, { (SHORT)width, (SHORT)height });
-}
-
-void getConsoleSize(HANDLE buffer, unsigned short *width, unsigned short *height) {
-    CONSOLE_SCREEN_BUFFER_INFO info;
-    GetConsoleScreenBufferInfo(buffer, &info);
-    *width = info.srWindow.Right - info.srWindow.Left + 1;
-    *height = info.srWindow.Bottom - info.srWindow.Top + 1;
-}
+WindowsConsole rawConsole(GetStdHandle(STD_OUTPUT_HANDLE), width + 4, (height + 1) / 2 + 2);
+BufferedConsoleRegion console(std::shared_ptr<WindowsConsole>(&rawConsole, [](WindowsConsole *) {}), width, (height + 1) / 2, 1, 2);
 
 void printString(std::string str, unsigned short x, unsigned short y) {
     for (int i = 0; i < str.length(); i++)
         console.set(x, y + i, str[i], make_color(BLACK, WHITE));
-}
-
-bool resizeWithAutoFont(HANDLE buffer, unsigned short width, unsigned short height, unsigned short minFont) {
-    unsigned short w = 0, h = 0;
-    for (unsigned short i = 72; i >= minFont; i--) {
-        setConsoleFontSize(buffer, i);
-        setConsoleSize(buffer, width, height);
-        getConsoleSize(buffer, &w, &h);
-        if (w == width && h == height)
-            return true;
-    }
-    return false;
 }
 
 class RollingAverage {
@@ -79,14 +45,11 @@ int main() {
 
     ConsoleColor color = RED;
 
-    if (!resizeWithAutoFont(GetStdHandle(STD_OUTPUT_HANDLE), width, (height + 1) / 2, 2))
-        abort();
-
-    DWORD lastTicks = GetTickCount();
+    ULONGLONG lastTicks = GetTickCount64();
 
     RollingAverage frametime(25);
 
-    DoublePixelConsoleBuffer buffer(width, height);
+    DoublePixelBufferedConsole buffer(width, height);
 
     while (true) {
         for (int i = 0; i < width; i++) {
@@ -98,10 +61,10 @@ int main() {
             }
         }
 
-        buffer.commit(console, 0, 0);
+        buffer.commit(console);
 
-        DWORD ticks = timeGetTime();
-        DWORD time = ticks - lastTicks;
+		ULONGLONG ticks = timeGetTime();
+		ULONGLONG time = ticks - lastTicks;
         frametime.add(time);
 
         std::ostringstream msg1;
@@ -113,7 +76,7 @@ int main() {
 
         lastTicks = ticks;
 
-        console.commit();
+        rawConsole.commit();
 
         color = make_fg_color((ConsoleColor)(color + 1));
 

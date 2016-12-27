@@ -15,44 +15,79 @@ ConsoleColor Hilltop::Console::make_fg_color(ConsoleColor foreground) {
     return make_color((ConsoleColor)0, foreground);
 }
 
-Hilltop::Console::ConsoleBuffer::ConsoleBuffer(unsigned short width, unsigned short height)
-    : width(width), height(height), buffer(width * height) {}
-
-void Hilltop::Console::ConsoleBuffer::set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color,
-    ConsoleColorType colorMask) {
-    const unsigned int idx = x * width + y;
-    buffer[idx].ch = ch;
-    buffer[idx].color = (buffer[idx].color & ~colorMask) | (color & colorMask);
+ConsoleColor Hilltop::Console::calc_masked_color(ConsoleColor old, ConsoleColor color, ConsoleColorType mask) {
+	return (ConsoleColor)((old & ~mask) | (color & mask));
 }
 
-void Hilltop::Console::ConsoleBuffer::clear(ConsoleColor color) {
-    buffer.assign(buffer.size(), { L' ', (uint8_t)color });
+Hilltop::Console::Console::Console(unsigned short width, unsigned short height)
+	: width(width), height(height) {}
+
+void Hilltop::Console::Console::clear(ConsoleColor color) {
+	for (int i = 0; i < width; i++)
+		for (int j = 0; j < height; j++)
+			set(i, j, ' ', color);
 }
 
-Hilltop::Console::DoublePixelConsoleBuffer::DoublePixelConsoleBuffer(unsigned short width, unsigned short height)
-    : width((width + 1) / 2 * 2), height((height + 1) / 2 * 2) {
-    buffer = std::vector<uint8_t>(this->width * (this->height) / 2);
+Hilltop::Console::BufferedConsole::BufferedConsole(unsigned short width, unsigned short height)
+	: Console(width, height) {}
+
+Hilltop::Console::BufferedConsoleRegion::BufferedConsoleRegion(std::shared_ptr<BufferedConsole> console,
+	unsigned short width, unsigned short height, unsigned short x, unsigned short y)
+	: BufferedConsole(width, height), x(x), y(y), console(console) {}
+
+BufferedConsole::pixel_t Hilltop::Console::BufferedConsoleRegion::get(unsigned short x, unsigned short y) const {
+	if (enforceBounds) {
+		if (x < 0 || x >= height)
+			return pixel_t();
+		if (y < 0 || y >= width)
+			return pixel_t();
+	}
+	return console->get(this->x + x, this->y + y);
 }
 
-ConsoleColor Hilltop::Console::DoublePixelConsoleBuffer::get(unsigned short x, unsigned short y) {
-    const unsigned int idx = x * width + y;
-    return (ConsoleColor)((buffer[idx / 2] & BIT_MASKS[idx & 1]) >> BIT_SHIFTS[idx & 1]);
+void Hilltop::Console::BufferedConsoleRegion::set(unsigned short x, unsigned short y, wchar_t ch,
+	ConsoleColor color, ConsoleColorType colorMask) {
+	if (enforceBounds) {
+		if (x < 0 || x >= height)
+			return;
+		if (y < 0 || y >= width)
+			return;
+	}
+	console->set(this->x + x, this->y + y, ch, color, colorMask);
 }
 
-void Hilltop::Console::DoublePixelConsoleBuffer::set(unsigned short x, unsigned short y, ConsoleColor color) {
-    const unsigned int idx = x * width + y;
-    buffer[idx / 2] = (buffer[idx / 2] & BIT_MASKS[!(idx & 1)]) | ((color << BIT_SHIFTS[idx & 1]) & BIT_MASKS[idx & 1]);
+bool Hilltop::Console::BufferedConsoleRegion::enforcingBounds() const {
+	return enforceBounds;
 }
 
-void Hilltop::Console::DoublePixelConsoleBuffer::clear(ConsoleColor color) {
-    uint8_t value = 0;
-    for (int i = 0; i < sizeof(BIT_MASKS) / sizeof(*BIT_MASKS); i++)
-        value |= (color << BIT_SHIFTS[i]) & BIT_MASKS[i];
-    buffer.assign(buffer.size(), value);
+void Hilltop::Console::BufferedConsoleRegion::setEnforceBounds(bool value) {
+	enforceBounds = value;
 }
 
-void Hilltop::Console::DoublePixelConsoleBuffer::commit(ConsoleBuffer &buffer, unsigned int x, unsigned int y) {
-    for (int i = 0; i < height / 2; i++)
-        for (int j = 0; j < width; j++)
-            buffer.set(x + i, y + j, L'▄', (ConsoleColor)((get(i * 2, j) << BACKGROUND_SHIFT) | get(i * 2 + 1, j)));
+Hilltop::Console::DoublePixelBufferedConsole::DoublePixelBufferedConsole(unsigned short width, unsigned short height)
+	: width((width + 1) / 2 * 2), height((height + 1) / 2 * 2) {
+	buffer = std::vector<uint8_t>(this->width * (this->height) / 2);
+}
+
+ConsoleColor Hilltop::Console::DoublePixelBufferedConsole::get(unsigned short x, unsigned short y) const {
+	const unsigned int idx = x * width + y;
+	return (ConsoleColor)((buffer[idx / 2] & BIT_MASKS[idx & 1]) >> BIT_SHIFTS[idx & 1]);
+}
+
+void Hilltop::Console::DoublePixelBufferedConsole::set(unsigned short x, unsigned short y, ConsoleColor color) {
+	const unsigned int idx = x * width + y;
+	buffer[idx / 2] = (buffer[idx / 2] & BIT_MASKS[!(idx & 1)]) | ((color << BIT_SHIFTS[idx & 1]) & BIT_MASKS[idx & 1]);
+}
+
+void Hilltop::Console::DoublePixelBufferedConsole::clear(ConsoleColor color) {
+	uint8_t value = 0;
+	for (int i = 0; i < sizeof(BIT_MASKS) / sizeof(*BIT_MASKS); i++)
+		value |= (color << BIT_SHIFTS[i]) & BIT_MASKS[i];
+	buffer.assign(buffer.size(), value);
+}
+
+void Hilltop::Console::DoublePixelBufferedConsole::commit(Console &buffer) const {
+	for (int i = 0; i < height / 2; i++)
+		for (int j = 0; j < width; j++)
+			buffer.set(i, j, L'▄', (ConsoleColor)((get(i * 2, j) << BACKGROUND_SHIFT) | get(i * 2 + 1, j)));
 }
