@@ -18,23 +18,24 @@ void printString(std::string str, unsigned short x, unsigned short y) {
         console.set(x, y + i, str[i], make_color(BLACK, WHITE));
 }
 
+template<typename T>
 class RollingAverage {
-    std::deque<int> Q;
+    std::deque<T> Q;
     int count;
 
 public:
     RollingAverage(int count) : count(count) {}
 
-    void add(int value) {
+    void add(T value) {
         while (Q.size() >= count)
             Q.pop_front();
         while (Q.size() < count)
             Q.push_back(value);
     }
 
-    int get() {
-        int s = 0;
-        for (int &x : Q)
+    T get() {
+        T s = 0;
+        for (T &x : Q)
             s += x;
         return s / count;
     }
@@ -46,25 +47,36 @@ int main() {
     ConsoleColor color = RED;
 
     ULONGLONG lastTicks = GetTickCount64();
+    ULONGLONG lastSec = lastTicks / 1000 - 1;
 
-    RollingAverage frametime(25);
+    RollingAverage<ULONGLONG> frametime(25);
 
     DoublePixelBufferedConsole buffer(width, height);
 
     while (true) {
-        for (int i = 0; i < width; i++) {
-            for (int j = 0; j < height; j++) {
-                const int f = 1;
-                if (!((i < width / f && j < height / f) || (i >= (width - width / f) && j >= (height - height / f))))
-                    continue;
-                buffer.set(j, i, make_fg_color((ConsoleColor)(color + i + j / 3)));
+        if (lastSec != lastTicks / 1000) {
+            for (int i = 0; i < width; i++) {
+                for (int j = 0; j < height; j++) {
+                    const int f = 1;
+                    if (!((i < width / f && j < height / f) || (i >= (width - width / f) && j >= (height - height / f))))
+                        continue;
+                    buffer.set(j, i, make_fg_color((ConsoleColor)(color + i + j / 2 + j / 1 % 2 * 8)));
+                }
             }
+
+            color = make_fg_color((ConsoleColor)(color + 1));
+            lastSec = lastTicks / 1000;
         }
+
+        int progress = lastTicks % 2000 / 100 + 6;
+        const ConsoleColor PROGRESS_COLORS[3] = { GRAY, DARK_GRAY, BLACK };
+        for (int i = 0; i < 3; i++)
+            buffer.set(i + 2, progress, PROGRESS_COLORS[i]);
 
         buffer.commit(console);
 
-		ULONGLONG ticks = timeGetTime();
-		ULONGLONG time = ticks - lastTicks;
+        ULONGLONG ticks = timeGetTime();
+        ULONGLONG time = ticks - lastTicks;
         frametime.add(time);
 
         std::ostringstream msg1;
@@ -77,8 +89,6 @@ int main() {
         lastTicks = ticks;
 
         rawConsole.commit();
-
-        color = make_fg_color((ConsoleColor)(color + 1));
 
         Sleep(1);
     }
