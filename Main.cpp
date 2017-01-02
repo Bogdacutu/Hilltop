@@ -1,95 +1,67 @@
-﻿#include <iostream>
-#include <Windows.h>
-#include "Console.h"
+﻿#include "Console.h"
 #include "Console.Windows.h"
-#include <sstream>
+#include "Game.h"
 #include <deque>
+#include <iostream>
+#include <memory>
+#include <sstream>
+#include <Windows.h>
 
 using namespace Hilltop::Console;
+using namespace Hilltop::Game;
 
-unsigned short width = 178;
-unsigned short height = 130;
-
-WindowsConsole rawConsole(GetStdHandle(STD_OUTPUT_HANDLE), width + 4, (height + 1) / 2 + 2);
-BufferedConsoleRegion console(std::shared_ptr<WindowsConsole>(&rawConsole, [](WindowsConsole *) {}), width, (height + 1) / 2, 1, 2);
-
-void printString(std::string str, unsigned short x, unsigned short y) {
-    for (int i = 0; i < str.length(); i++)
-        console.set(x, y + i, str[i], make_color(BLACK, WHITE));
-}
-
-template<typename T>
-class RollingAverage {
-    std::deque<T> Q;
-    int count;
-
-public:
-    RollingAverage(int count) : count(count) {}
-
-    void add(T value) {
-        while (Q.size() >= count)
-            Q.pop_front();
-        while (Q.size() < count)
-            Q.push_back(value);
-    }
-
-    T get() {
-        T s = 0;
-        for (T &x : Q)
-            s += x;
-        return s / count;
-    }
+enum engine_state_t {
+    STATE_MENU,
+    STATE_INGAME,
 };
+
+engine_state_t state = STATE_INGAME;
+bool consoleEnabled = false;
+
+const unsigned short MENU_WIDTH = 80;
+const unsigned short MENU_HEIGHT = 25;
+
+const unsigned short GAME_WIDTH = 200;
+const unsigned short GAME_HEIGHT = 50;
+
+std::shared_ptr<BufferedConsole> console;
 
 int main() {
     AttachConsole(-1);
 
-    ConsoleColor color = RED;
+    console = WindowsConsole::create(GetStdHandle(STD_OUTPUT_HANDLE), GAME_WIDTH, GAME_HEIGHT);
 
-    ULONGLONG lastTicks = GetTickCount64();
-    ULONGLONG lastSec = lastTicks / 1000 - 1;
+    TankMatch match(GAME_WIDTH - 4, GAME_HEIGHT * 2 - 4);
+    match.buildMap();
 
-    RollingAverage<ULONGLONG> frametime(25);
+    std::shared_ptr<BufferedConsoleRegion> mainRegion = BufferedConsoleRegion::create(*console,
+        GAME_WIDTH - 2, GAME_HEIGHT - 1, 1, 2);
+    DoublePixelBufferedConsole gamePixels(GAME_WIDTH - 4, GAME_HEIGHT * 2 - 4);
 
-    DoublePixelBufferedConsole buffer(width, height);
+    ULONGLONG lastTime = GetTickCount64();
+    uint64_t tickNumber = 0;
 
     while (true) {
-        if (lastSec != lastTicks / 1000) {
-            for (int i = 0; i < width; i++) {
-                for (int j = 0; j < height; j++) {
-                    const int f = 1;
-                    if (!((i < width / f && j < height / f) || (i >= (width - width / f) && j >= (height - height / f))))
-                        continue;
-                    buffer.set(j, i, make_fg_color((ConsoleColor)(color + i + j / 2 + j / 1 % 2 * 8)));
-                }
-            }
-
-            color = make_fg_color((ConsoleColor)(color + 1));
-            lastSec = lastTicks / 1000;
+        ULONGLONG nowTime = GetTickCount64();
+        int ticks = (nowTime - lastTime) / 100;
+        if (ticks < 1) {
+            Sleep(1);
+            continue;
         }
+        lastTime = nowTime;
 
-        int progress = lastTicks % 2000 / 100 + 6;
-        const ConsoleColor PROGRESS_COLORS[3] = { GRAY, DARK_GRAY, BLACK };
-        for (int i = 0; i < 3; i++)
-            buffer.set(i + 2, progress, PROGRESS_COLORS[i]);
+        console->clear(WHITE);
 
-        buffer.commit(console);
+        while (ticks--)
+            match.doTick(++tickNumber);
 
-        ULONGLONG ticks = timeGetTime();
-        ULONGLONG time = ticks - lastTicks;
-        frametime.add(time);
+        match.draw(gamePixels);
+        gamePixels.commit(*mainRegion);
 
-        std::ostringstream msg1;
-        msg1 << "Frame time: " << frametime.get() << " ms";
-        std::ostringstream msg2;
-        msg2 << "FPS: " << 1000 / max(1, frametime.get());
-        printString(msg1.str(), 3, 6);
-        printString(msg2.str(), 4, 6);
+        std::ostringstream corner;
+        corner << "Tick " << tickNumber;
+        printText(console.get(), 0, 0, GAME_WIDTH, 1, corner.str(), BLACK, false);
 
-        lastTicks = ticks;
-
-        rawConsole.commit();
-
-        Sleep(1);
+        console->commit();
     }
 }

@@ -6,7 +6,7 @@
 namespace Hilltop {
     namespace Console {
 
-        enum ConsoleColor {
+        enum ConsoleColor : unsigned char {
             BLACK = 0,
             DARK_BLUE = 1,
             DARK_GREEN = 2,
@@ -25,7 +25,7 @@ namespace Hilltop {
             WHITE = 15,
         };
 
-        enum ConsoleColorType {
+        enum ConsoleColorType : unsigned char {
             FOREGROUND_COLOR = 0xf,
             BACKGROUND_COLOR = 0xf0,
             FOREGROUND_SHIFT = 0,
@@ -39,7 +39,7 @@ namespace Hilltop {
         ConsoleColor calc_masked_color(ConsoleColor old, ConsoleColor color, ConsoleColorType mask);
 
 
-        class Console {
+        class Console : public std::enable_shared_from_this<Console> {
         protected:
             Console(unsigned short width, unsigned short height);
 
@@ -48,8 +48,7 @@ namespace Hilltop {
 
             virtual ~Console() {}
 
-            virtual void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color,
-                ConsoleColorType colorMask = (ConsoleColorType)(BACKGROUND_COLOR | FOREGROUND_COLOR)) = 0;
+            virtual void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color) = 0;
             virtual void clear(ConsoleColor color);
 
             virtual void commit() const {}
@@ -67,24 +66,29 @@ namespace Hilltop {
             } pixel_t;
 
             virtual pixel_t get(unsigned short x, unsigned short y) const = 0;
+            virtual void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color) override;
+            virtual void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color,
+                ConsoleColorType colorMask) = 0;
         };
 
 
         class BufferedConsoleRegion final : public BufferedConsole {
-        private:
-            bool enforceBounds = true;
-            std::shared_ptr<BufferedConsole> console;
-            unsigned short x, y;
+        protected:
+            BufferedConsoleRegion(BufferedConsole &console, unsigned short width, unsigned short height,
+                unsigned short x, unsigned short y);
 
         public:
-            BufferedConsoleRegion(std::shared_ptr<BufferedConsole> console, unsigned short width, unsigned short height, unsigned short x, unsigned short y);
+            const std::shared_ptr<BufferedConsole> console;
+            const unsigned short x, y;
+
+            bool enforceBounds = true;
+
+            static std::shared_ptr<BufferedConsoleRegion> create(BufferedConsole &console,
+                unsigned short width, unsigned short height, unsigned short x, unsigned short y);
 
             virtual pixel_t get(unsigned short x, unsigned short y) const override;
             virtual void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color,
-                ConsoleColorType colorMask = (ConsoleColorType)(BACKGROUND_COLOR | FOREGROUND_COLOR)) override;
-
-            bool enforcingBounds() const;
-            void setEnforceBounds(bool value);
+                ConsoleColorType colorMask) override;
         };
 
         
@@ -106,5 +110,19 @@ namespace Hilltop {
 
             void commit(Console &buffer) const;
         };
+
+
+        typedef struct {
+            unsigned short lines, cols;
+        } TextBoxSize;
+
+        enum TextAlignment {
+            LEFT,
+            CENTER,
+            RIGHT,
+        };
+
+        TextBoxSize printText(BufferedConsole *buffer, unsigned short x, unsigned short y, unsigned short width,
+            unsigned short height, std::string text, ConsoleColor color, bool wordWrap = true);
     }
 }

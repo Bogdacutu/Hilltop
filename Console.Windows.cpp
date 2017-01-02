@@ -28,9 +28,9 @@ static void getConsoleSize(HANDLE buffer, unsigned short *width, unsigned short 
     *height = info.srWindow.Bottom - info.srWindow.Top + 1;
 }
 
-static bool resizeWithAutoFont(HANDLE buffer, unsigned short width, unsigned short height, unsigned short minFont) {
+static bool resizeWithAutoFont(HANDLE buffer, unsigned short width, unsigned short height, unsigned short minFont, unsigned short maxFont) {
     unsigned short w = 0, h = 0;
-    for (unsigned short i = 72; i >= minFont; i--) {
+    for (unsigned short i = maxFont; i >= minFont; i--) {
         setConsoleFontSize(buffer, i);
         setConsoleSize(buffer, width, height);
         getConsoleSize(buffer, &w, &h);
@@ -43,7 +43,6 @@ static bool resizeWithAutoFont(HANDLE buffer, unsigned short width, unsigned sho
 static void setGameBufferProps(HANDLE buffer) {
     CONSOLE_SCREEN_BUFFER_INFOEX info = { sizeof(info) };
     GetConsoleScreenBufferInfoEx(buffer, &info);
-    info.srWindow.Bottom++;
 
     // http://www.romanzolotarev.com/pico-8-color-palette/
     info.ColorTable[BLACK] = RGB(0, 0, 0);
@@ -53,7 +52,7 @@ static void setGameBufferProps(HANDLE buffer) {
     info.ColorTable[BROWN] = RGB(171, 82, 54);
     info.ColorTable[DARK_GRAY] = RGB(95, 87, 79);
     info.ColorTable[GRAY] = RGB(194, 195, 199);
-    info.ColorTable[WHITE] = RGB(255, 241, 232);
+    info.ColorTable[WHITE] = RGB(255, 255, 255);
     info.ColorTable[RED] = RGB(255, 0, 71);
     info.ColorTable[ORANGE] = RGB(255, 163, 0);
     info.ColorTable[YELLOW] = RGB(255, 236, 39);
@@ -64,12 +63,22 @@ static void setGameBufferProps(HANDLE buffer) {
     info.ColorTable[PEACH] = RGB(255, 204, 170);
 
     SetConsoleScreenBufferInfoEx(buffer, &info);
+
+    CONSOLE_CURSOR_INFO cursorInfo;
+    cursorInfo.dwSize = 100;
+    cursorInfo.bVisible = FALSE;
+    SetConsoleCursorInfo(buffer, &cursorInfo);
 }
 
 Hilltop::Console::WindowsConsole::WindowsConsole(HANDLE handle, unsigned short width, unsigned short height,
-    unsigned short minFont) : BufferedConsole(width, height), handle(handle) {
-    resizeWithAutoFont(handle, width, height, minFont);
+    unsigned short minFont, unsigned short maxFont) : BufferedConsole(width, height), handle(handle) {
     setGameBufferProps(handle);
+    resizeWithAutoFont(handle, width, height, minFont, maxFont);
+}
+
+std::shared_ptr<WindowsConsole> Hilltop::Console::WindowsConsole::create(HANDLE handle, unsigned short width,
+    unsigned short height, unsigned short minFont, unsigned short maxFont) {
+    return std::shared_ptr<WindowsConsole>(new WindowsConsole(handle, width, height, minFont, maxFont));
 }
 
 BufferedConsole::pixel_t Hilltop::Console::WindowsConsole::get(unsigned short x, unsigned short y) const {

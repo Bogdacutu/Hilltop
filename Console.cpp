@@ -1,4 +1,7 @@
 ﻿#include "Console.h"
+#include <algorithm>
+#include <deque>
+#include <sstream>
 
 using namespace Hilltop::Console;
 
@@ -23,17 +26,28 @@ Hilltop::Console::Console::Console(unsigned short width, unsigned short height)
     : width(width), height(height) {}
 
 void Hilltop::Console::Console::clear(ConsoleColor color) {
-    for (int i = 0; i < width; i++)
-        for (int j = 0; j < height; j++)
+    color = make_bg_color(color);
+    for (int i = 0; i < height; i++)
+        for (int j = 0; j < width; j++)
             set(i, j, ' ', color);
 }
 
 Hilltop::Console::BufferedConsole::BufferedConsole(unsigned short width, unsigned short height)
     : Console(width, height) {}
 
-Hilltop::Console::BufferedConsoleRegion::BufferedConsoleRegion(std::shared_ptr<BufferedConsole> console,
+void Hilltop::Console::BufferedConsole::set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color) {
+    set(x, y, ch, color, (ConsoleColorType)(BACKGROUND_COLOR | FOREGROUND_COLOR));
+}
+
+Hilltop::Console::BufferedConsoleRegion::BufferedConsoleRegion(BufferedConsole &console,
     unsigned short width, unsigned short height, unsigned short x, unsigned short y)
-    : BufferedConsole(width, height), x(x), y(y), console(console) {}
+    : BufferedConsole(width, height), x(x), y(y)
+    , console(std::static_pointer_cast<BufferedConsole>(console.shared_from_this())) {}
+
+std::shared_ptr<BufferedConsoleRegion> Hilltop::Console::BufferedConsoleRegion::create(BufferedConsole& console,
+    unsigned short width, unsigned short height, unsigned short x, unsigned short y) {
+    return std::shared_ptr<BufferedConsoleRegion>(new BufferedConsoleRegion(console, width, height, x, y));
+}
 
 BufferedConsole::pixel_t Hilltop::Console::BufferedConsoleRegion::get(unsigned short x, unsigned short y) const {
     if (enforceBounds)
@@ -50,14 +64,6 @@ void Hilltop::Console::BufferedConsoleRegion::set(unsigned short x, unsigned sho
             return;
 
     console->set(this->x + x, this->y + y, ch, color, colorMask);
-}
-
-bool Hilltop::Console::BufferedConsoleRegion::enforcingBounds() const {
-    return enforceBounds;
-}
-
-void Hilltop::Console::BufferedConsoleRegion::setEnforceBounds(bool value) {
-    enforceBounds = value;
 }
 
 const uint8_t Hilltop::Console::DoublePixelBufferedConsole::BIT_MASKS[2] = { 0xf0, 0xf };
@@ -94,4 +100,65 @@ void Hilltop::Console::DoublePixelBufferedConsole::commit(Console &buffer) const
             buffer.set(i, j, c, make_color(x, y));
         }
     }
+}
+
+TextBoxSize Hilltop::Console::printText(BufferedConsole *buffer, unsigned short x, unsigned short y,
+    unsigned short width, unsigned short height, std::string text, ConsoleColor color, bool wordWrap) {
+    std::istringstream input(text);
+    std::string word, lineIn, lineOut;
+    std::vector<std::string> lines;
+    
+    while (std::getline(input, lineIn)) {
+        std::deque<std::string> words;
+        {
+            std::istringstream lineInput(lineIn);
+            while (lineInput >> word)
+                words.push_back(word);
+        }
+        bool hadWords = words.size() > 0;
+
+        while (words.size()) {
+            word = words.front();
+            words.pop_front();
+
+            if (word.size() > width) {
+                words.push_front(word.substr(width));
+                word = word.substr(0, width);
+            }
+            
+            if (wordWrap && lineOut.length() && word.length() + lineOut.length() + 1 > width) {
+                lines.push_back(lineOut);
+                if (lines.size() == height)
+                    break;
+                lineOut.clear();
+            }
+            if (lineOut.length())
+                lineOut += ' ';
+            lineOut += word;
+        }
+
+        if (lines.size() == height)
+            break;
+
+        if (lineOut.length() || !hadWords) {
+            lines.push_back(lineOut);
+            if (lines.size() == height)
+                break;
+            lineOut.clear();
+        }
+    }
+
+    if (buffer) {
+        std::shared_ptr<BufferedConsoleRegion> region = BufferedConsoleRegion::create(*buffer, width, height, x, y);
+        for (int i = 0; i < lines.size(); i++)
+            for (int j = 0; j < lines[i].length(); j++)
+                region->set(i, j, lines[i][j], color, FOREGROUND_COLOR);
+    }
+
+    TextBoxSize ret;
+    ret.lines = (unsigned short)lines.size();
+    ret.cols = 0;
+    for (int i = 0; i < lines.size(); i++)
+        ret.cols = std::max(ret.cols, (unsigned short)lines[i].length());
+    return ret;
 }
