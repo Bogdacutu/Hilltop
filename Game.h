@@ -78,6 +78,7 @@ namespace Hilltop {
             bool groundHog = false;
             bool hasHit = false;
             int entityAge = 0;
+            int maxEntityAge = -1;
 
             virtual ~Entity();
             static std::shared_ptr<Entity> create();
@@ -85,6 +86,7 @@ namespace Hilltop {
             virtual void onTick(TankMatch *match);
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console);
             virtual void onHit(TankMatch *match);
+            virtual void onExpire(TankMatch *match);
         };
 
 
@@ -121,12 +123,10 @@ namespace Hilltop {
             MissleTrail(int maxAge, ConsoleColor color);
 
         public:
-            const int maxAge;
             ConsoleColor color;
 
             static std::shared_ptr<MissleTrail> create(int maxAge, ConsoleColor color);
 
-            virtual void onTick(TankMatch *match) override;
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
         };
 
@@ -168,7 +168,7 @@ namespace Hilltop {
 
         class Tank final : public Entity {
         protected:
-            Tank(ConsoleColor color);
+            Tank(ConsoleColor color, ConsoleColor barrelColor);
 
         public:
             ConsoleColor color;
@@ -180,6 +180,7 @@ namespace Hilltop {
             int power = 50;
 
             static std::shared_ptr<Tank> create(ConsoleColor color);
+            static std::shared_ptr<Tank> create(ConsoleColor color, ConsoleColor barrelColor);
             void initWheels(TankMatch *match);
 
             virtual void onTick(TankMatch *match) override;

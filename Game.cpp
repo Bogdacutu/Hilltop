@@ -51,6 +51,10 @@ std::shared_ptr<Entity> Hilltop::Game::Entity::create() {
 
 void Hilltop::Game::Entity::onTick(TankMatch *match) {
     entityAge++;
+
+    if (maxEntityAge >= 0)
+        if (entityAge > maxEntityAge)
+            onExpire(match);
 }
 
 void Hilltop::Game::Entity::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {}
@@ -58,6 +62,10 @@ void Hilltop::Game::Entity::onDraw(TankMatch *match, Console::DoublePixelBuffere
 void Hilltop::Game::Entity::onHit(TankMatch *match) {
     hasHit = true;
     direction = { 0.0f, 0.0f };
+}
+
+void Hilltop::Game::Entity::onExpire(TankMatch *match) {
+    match->removeEntity(*this);
 }
 
 
@@ -84,7 +92,7 @@ void Hilltop::Game::SimpleMissle::onHit(TankMatch *match) {
 
     match->removeEntity(*this);
 
-    std::shared_ptr<Explosion> ex = Explosion::create(3, 4);
+    std::shared_ptr<Explosion> ex = Explosion::create(8, 4);
     ex->position = position;
     ex->willDestroyLand = true;
     match->addEntity(*ex);
@@ -128,20 +136,13 @@ void Hilltop::Game::SimpleTrailedMissile::onTick(TankMatch *match) {
 // MissleTrail
 //
 
-Hilltop::Game::MissleTrail::MissleTrail(int maxAge, ConsoleColor color)
-    : Entity(), maxAge(maxAge), color(color) {
+Hilltop::Game::MissleTrail::MissleTrail(int maxAge, ConsoleColor color) : Entity(), color(color) {
+    maxEntityAge = maxAge;
     gravityMult = 0.0f;
 }
 
 std::shared_ptr<MissleTrail> Hilltop::Game::MissleTrail::create(int maxAge, ConsoleColor color) {
     return std::shared_ptr<MissleTrail>(new MissleTrail(maxAge, color));
-}
-
-void Hilltop::Game::MissleTrail::onTick(TankMatch *match) {
-    Entity::onTick(match);
-
-    if (entityAge >= maxAge)
-        match->removeEntity(*this);
 }
 
 void Hilltop::Game::MissleTrail::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
@@ -250,12 +251,17 @@ void Hilltop::Game::TankWheel::onDraw(TankMatch *match, Console::DoublePixelBuff
 // Tank
 //
 
-Hilltop::Game::Tank::Tank(ConsoleColor color) : Entity(), color(color), barrelColor(color) {
+Hilltop::Game::Tank::Tank(ConsoleColor color, ConsoleColor barrelColor)
+    : Entity(), color(color), barrelColor(barrelColor) {
     gravityMult = 0.0f;
 }
 
 std::shared_ptr<Tank> Hilltop::Game::Tank::create(ConsoleColor color) {
-    return std::shared_ptr<Tank>(new Tank(color));
+    return std::shared_ptr<Tank>(new Tank(color, color));
+}
+
+std::shared_ptr<Tank> Hilltop::Game::Tank::create(ConsoleColor color, ConsoleColor barrelColor) {
+    return std::shared_ptr<Tank>(new Tank(color, barrelColor));
 }
 
 void Hilltop::Game::Tank::initWheels(TankMatch *match) {
@@ -286,18 +292,20 @@ void Hilltop::Game::Tank::onDraw(TankMatch *match, Console::DoublePixelBufferedC
     Entity::onDraw(match, console);
 
     Vector2 p = position.round();
+    
+    // draw barrel
+    float a = angle * pi / 180.0f;
+    foreachPixel(p, p + Vector2(std::sinf(a) * 2.0f, std::cosf(a) * 2.0f),
+        [this, &console](Vector2 v)->bool {
+        console.set(v.X - 2, v.Y + 2, barrelColor);
+        return false;
+    });
+
+    // draw the rest of the tank
     for (int i = 0; i < 5; i++)
         console.set(p.X - 1, p.Y + i, color);
     for (int i = 1; i < 4; i++)
         console.set(p.X - 2, p.Y + i, color);
-    
-    float a = angle * pi / 180.0f;
-    foreachPixel(p, p + Vector2(std::sinf(a) * 2.0f, std::cosf(a) * 2.0f),
-        [this, &console, p](Vector2 v)->bool {
-        if (v != p)
-            console.set(v.X - 2, v.Y + 2, barrelColor);
-        return false;
-    });
 }
 
 
@@ -317,12 +325,15 @@ void Hilltop::Game::TankMatch::doEntityTick() {
         std::pair<bool, std::shared_ptr<Entity>> ev = entityChanges.front();
         entityChanges.pop();
 
+        std::vector<std::shared_ptr<Entity>>::iterator it =
+            std::find(entities.begin(), entities.end(), ev.second);
+        bool exists = it != entities.end();
+
         if (ev.first) {
-            entities.push_back(ev.second);
+            if (!exists)
+                entities.push_back(ev.second);
         } else {
-            std::vector<std::shared_ptr<Entity>>::iterator it =
-                std::find(entities.begin(), entities.end(), ev.second);
-            if (it != entities.end())
+            if (exists)
                 entities.erase(it);
         }
     }
@@ -337,7 +348,7 @@ void Hilltop::Game::TankMatch::doEntityTick() {
 
         p->direction = p->direction + gravity * p->gravityMult;
 
-        if (p->position.Y < 0 || p->position.Y >= width || p->position.X > height)
+        if (p->position.Y < 0 || p->position.Y >= width || p->position.X > height + 1)
             removeEntity(*p);
     }
 }
@@ -350,7 +361,7 @@ Vector2 Hilltop::Game::TankMatch::calcTrajectory(int angle, int power) {
 
 LandType Hilltop::Game::TankMatch::get(int x, int y) {
     if (x < 0 || x >= height || y < 0 || y >= width) {
-        if (x == height)
+        if (x >= height)
             return DIRT;
         else
             return AIR;
