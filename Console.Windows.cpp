@@ -65,7 +65,7 @@ static void setGameBufferProps(HANDLE buffer) {
     SetConsoleScreenBufferInfoEx(buffer, &info);
 
     CONSOLE_CURSOR_INFO cursorInfo;
-    cursorInfo.dwSize = 100;
+    cursorInfo.dwSize = 1;
     cursorInfo.bVisible = FALSE;
     SetConsoleCursorInfo(buffer, &cursorInfo);
 }

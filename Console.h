@@ -123,6 +123,7 @@ namespace Hilltop {
         };
 
         TextBoxSize printText(BufferedConsole *buffer, unsigned short x, unsigned short y, unsigned short width,
-            unsigned short height, std::string text, ConsoleColor color, bool wordWrap = true);
+            unsigned short height, std::string text, ConsoleColor color, TextAlignment align = LEFT,
+            bool wordWrap = true);
     }
 }

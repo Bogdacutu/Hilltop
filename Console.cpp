@@ -75,11 +75,17 @@ Hilltop::Console::DoublePixelBufferedConsole::DoublePixelBufferedConsole(unsigne
 }
 
 ConsoleColor Hilltop::Console::DoublePixelBufferedConsole::get(unsigned short x, unsigned short y) const {
+    if (x >= height || y >= width)
+        return ConsoleColor();
+
     const unsigned int idx = x * width + y;
     return (ConsoleColor)((buffer[idx / 2] & BIT_MASKS[idx & 1]) >> BIT_SHIFTS[idx & 1]);
 }
 
 void Hilltop::Console::DoublePixelBufferedConsole::set(unsigned short x, unsigned short y, ConsoleColor color) {
+    if (x >= height || y >= width)
+        return;
+
     const unsigned int idx = x * width + y;
     buffer[idx / 2] = (buffer[idx / 2] & BIT_MASKS[!(idx & 1)]) | ((color << BIT_SHIFTS[idx & 1]) & BIT_MASKS[idx & 1]);
 }
@@ -103,7 +109,8 @@ void Hilltop::Console::DoublePixelBufferedConsole::commit(Console &buffer) const
 }
 
 TextBoxSize Hilltop::Console::printText(BufferedConsole *buffer, unsigned short x, unsigned short y,
-    unsigned short width, unsigned short height, std::string text, ConsoleColor color, bool wordWrap) {
+    unsigned short width, unsigned short height, std::string text, ConsoleColor color, TextAlignment align,
+    bool wordWrap) {
     std::istringstream input(text);
     std::string word, lineIn, lineOut;
     std::vector<std::string> lines;
@@ -150,9 +157,16 @@ TextBoxSize Hilltop::Console::printText(BufferedConsole *buffer, unsigned short 
 
     if (buffer) {
         std::shared_ptr<BufferedConsoleRegion> region = BufferedConsoleRegion::create(*buffer, width, height, x, y);
-        for (int i = 0; i < lines.size(); i++)
+        for (int i = 0; i < lines.size(); i++) {
+            int offset = 0;
+            if (align == CENTER)
+                offset = (width - lines[i].length()) / 2;
+            else if (align == RIGHT)
+                offset = width - lines[i].length();
+
             for (int j = 0; j < lines[i].length(); j++)
-                region->set(i, j, lines[i][j], color, FOREGROUND_COLOR);
+                region->set(i, offset + j, lines[i][j], color, FOREGROUND_COLOR);
+        }
     }
 
     TextBoxSize ret;
