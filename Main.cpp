@@ -36,7 +36,15 @@ int main() {
     console = WindowsConsole::create(GetStdHandle(STD_OUTPUT_HANDLE), GAME_WIDTH, GAME_HEIGHT);
 
     TankMatch match(GAME_WIDTH - 4, GAME_HEIGHT * 2 - 4);
-    match.buildMap([](float x) { return (std::sin(x * 2 - 1.4) + 1) / 2 + 0.1; });
+    match.buildMap([](float x) { return (std::sinf(x * 2 - 1.4f) + 1) / 2 + 0.1f; });
+
+    for (int i = 0; i < GAME_WIDTH - 4; i += 10) {
+        std::shared_ptr<Tank> tank = Tank::create(BLUE);
+        tank->position = { 10, (float)i };
+        tank->angle = (i * 2) % 360;
+        tank->initWheels(&match);
+        match.addEntity(*tank);
+    }
 
     std::shared_ptr<BufferedConsoleRegion> mainRegion = BufferedConsoleRegion::create(*console,
         GAME_WIDTH - 2, GAME_HEIGHT - 1, 1, 2);
@@ -47,7 +55,7 @@ int main() {
 
     while (true) {
         ULONGLONG nowTime = GetTickCount64();
-        int ticks = (nowTime - lastTime) / GAME_TICK_MS;
+        int ticks = (int)((nowTime - lastTime) / GAME_TICK_MS);
         if (ticks < 1) {
             Sleep(1);
             continue;

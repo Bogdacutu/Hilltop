@@ -59,24 +59,28 @@ namespace Hilltop {
         float distance(const Vector2 from, const Vector2 to);
 
         void foreachPixel(const Vector2 from, const Vector2 to, std::function<bool(Vector2)> handler);
+        
 
 
         class TankMatch;
 
 
-        class Projectile : public std::enable_shared_from_this<Projectile> {
+
+        class Entity : public std::enable_shared_from_this<Entity> {
         protected:
-            Projectile();
+            Entity();
 
         public:
             Vector2 position;
             Vector2 direction;
-            Vector2 gravity = { 0.15, 0 };
+            float gravityMult = 1.0f;
 
             bool groundHog = false;
             bool hasHit = false;
+            int entityAge = 0;
 
-            virtual ~Projectile();
+            virtual ~Entity();
+            static std::shared_ptr<Entity> create();
 
             virtual void onTick(TankMatch *match);
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console);
@@ -84,7 +88,7 @@ namespace Hilltop {
         };
 
 
-        class SimpleMissle : public Projectile {
+        class SimpleMissle : public Entity {
         protected:
             SimpleMissle(ConsoleColor color);
 
@@ -112,13 +116,12 @@ namespace Hilltop {
         };
 
 
-        class MissleTrail final : public Projectile {
+        class MissleTrail final : public Entity {
         protected:
             MissleTrail(int maxAge, ConsoleColor color);
 
         public:
             const int maxAge;
-            int age = 0;
             ConsoleColor color;
 
             static std::shared_ptr<MissleTrail> create(int maxAge, ConsoleColor color);
@@ -128,15 +131,13 @@ namespace Hilltop {
         };
 
 
-        class Explosion : public Projectile {
+        class Explosion final : public Entity {
         protected:
             Explosion(int size, int damage);
 
-            void destroyLand(TankMatch *match);
+            const int ticksBetween = 2;
 
-            bool firstTick = true;
-            const int ticksBetween = 1;
-            int ticksLeft = ticksBetween;
+            void destroyLand(TankMatch *match);
 
         public:
             const int size;
@@ -146,6 +147,40 @@ namespace Hilltop {
             bool willDestroyLand = false;
 
             static std::shared_ptr<Explosion> create(int size, int damage);
+
+            virtual void onTick(TankMatch *match) override;
+            virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
+        };
+
+
+        class TankWheel final : public Entity {
+        protected:
+            TankWheel();
+
+        public:
+            static bool enableDebug;
+
+            static std::shared_ptr<TankWheel> create();
+
+            virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
+        };
+
+
+        class Tank final : public Entity {
+        protected:
+            Tank(ConsoleColor color);
+
+        public:
+            ConsoleColor color;
+            ConsoleColor barrelColor;
+
+            std::shared_ptr<Entity> wheels[5];
+
+            int angle = 45;
+            int power = 50;
+
+            static std::shared_ptr<Tank> create(ConsoleColor color);
+            void initWheels(TankMatch *match);
 
             virtual void onTick(TankMatch *match) override;
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
@@ -165,25 +200,27 @@ namespace Hilltop {
         private:
             std::vector<LandType> map;
 
-            std::vector<std::shared_ptr<Projectile>> projectiles;
-            std::queue<std::pair<bool, std::shared_ptr<Projectile>>> projectileChanges;
+            std::vector<std::shared_ptr<Entity>> entities;
+            std::queue<std::pair<bool, std::shared_ptr<Entity>>> entityChanges;
 
             const int timeBetweenMissles = 3;
             int timeSinceLast = 0;
 
-            void doProjectileTick();
+            void doEntityTick();
             Vector2 calcTrajectory(int angle, int power);
 
         public:
             const unsigned short width, height;
+
+            Vector2 gravity = { 0.15f, 0.0f };
 
             TankMatch(unsigned short width, unsigned short height);
 
             LandType get(int x, int y);
             void set(int x, int y, LandType type);
 
-            void addProjectile(Projectile &projectile);
-            void removeProjectile(Projectile &projectile);
+            void addEntity(Entity &entity);
+            void removeEntity(Entity &entity);
 
             void buildMap(std::function<float(float)> generator);
             std::pair<bool, Vector2> checkForHit(const Vector2 from, const Vector2 to, bool groundHog = false);

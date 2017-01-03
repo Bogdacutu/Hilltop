@@ -2,6 +2,8 @@
 #include "Console.h"
 #include <algorithm>
 
+#pragma warning(disable: 4244)
+
 using namespace Hilltop::Console;
 using namespace Hilltop::Game;
 
@@ -36,19 +38,26 @@ void Hilltop::Game::foreachPixel(const Vector2 from, const Vector2 to, std::func
 
 
 //
-// Projectile
+// Entity
 //
 
-Hilltop::Game::Projectile::Projectile() {}
+Hilltop::Game::Entity::Entity() {}
 
-Hilltop::Game::Projectile::~Projectile() {}
+Hilltop::Game::Entity::~Entity() {}
 
-void Hilltop::Game::Projectile::onTick(TankMatch *match) {}
+std::shared_ptr<Entity> Hilltop::Game::Entity::create() {
+    return std::shared_ptr<Entity>(new Entity());
+}
 
-void Hilltop::Game::Projectile::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {}
+void Hilltop::Game::Entity::onTick(TankMatch *match) {
+    entityAge++;
+}
 
-void Hilltop::Game::Projectile::onHit(TankMatch *match) {
+void Hilltop::Game::Entity::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {}
+
+void Hilltop::Game::Entity::onHit(TankMatch *match) {
     hasHit = true;
+    direction = { 0.0f, 0.0f };
 }
 
 
@@ -57,28 +66,28 @@ void Hilltop::Game::Projectile::onHit(TankMatch *match) {
 // SimpleMissle
 //
 
-Hilltop::Game::SimpleMissle::SimpleMissle(ConsoleColor color) : Projectile(), color(color) {}
+Hilltop::Game::SimpleMissle::SimpleMissle(ConsoleColor color) : Entity(), color(color) {}
 
 std::shared_ptr<SimpleMissle> Hilltop::Game::SimpleMissle::create(ConsoleColor color) {
     return std::shared_ptr<SimpleMissle>(new SimpleMissle(color));
 }
 
 void Hilltop::Game::SimpleMissle::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
-    Projectile::onDraw(match, console);
+    Entity::onDraw(match, console);
 
     Vector2 p = position.round();
     console.set(p.X, p.Y, WHITE);
 }
 
 void Hilltop::Game::SimpleMissle::onHit(TankMatch *match) {
-    Projectile::onHit(match);
+    Entity::onHit(match);
 
-    match->removeProjectile(*this);
+    match->removeEntity(*this);
 
-    std::shared_ptr<Explosion> ex = Explosion::create(4, 4);
+    std::shared_ptr<Explosion> ex = Explosion::create(3, 4);
     ex->position = position;
     ex->willDestroyLand = true;
-    match->addProjectile(*ex);
+    match->addEntity(*ex);
 }
 
 
@@ -98,7 +107,7 @@ void Hilltop::Game::SimpleTrailedMissile::onTick(TankMatch *match) {
     SimpleMissle::onTick(match);
 
     if (!hasHit) {
-        Vector2 from = position - gravity;
+        Vector2 from = position - match->gravity * gravityMult;
         Vector2 to = from + direction;
         to = match->checkForHit(position, to).second.round();
         foreachPixel(from, to, [this, match, to](Vector2 p)->bool {
@@ -107,7 +116,7 @@ void Hilltop::Game::SimpleTrailedMissile::onTick(TankMatch *match) {
 
             std::shared_ptr<MissleTrail> trail = MissleTrail::create(trailTime, trailColor);
             trail->position = p;
-            match->addProjectile(*trail);
+            match->addEntity(*trail);
             return false;
         });
     }
@@ -120,8 +129,8 @@ void Hilltop::Game::SimpleTrailedMissile::onTick(TankMatch *match) {
 //
 
 Hilltop::Game::MissleTrail::MissleTrail(int maxAge, ConsoleColor color)
-    : Projectile(), maxAge(maxAge), color(color) {
-    gravity = { 0, 0 };
+    : Entity(), maxAge(maxAge), color(color) {
+    gravityMult = 0.0f;
 }
 
 std::shared_ptr<MissleTrail> Hilltop::Game::MissleTrail::create(int maxAge, ConsoleColor color) {
@@ -129,16 +138,14 @@ std::shared_ptr<MissleTrail> Hilltop::Game::MissleTrail::create(int maxAge, Cons
 }
 
 void Hilltop::Game::MissleTrail::onTick(TankMatch *match) {
-    Projectile::onTick(match);
+    Entity::onTick(match);
 
-    if (age >= maxAge)
-        match->removeProjectile(*this);
-    else
-        age++;
+    if (entityAge >= maxAge)
+        match->removeEntity(*this);
 }
 
 void Hilltop::Game::MissleTrail::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
-    Projectile::onDraw(match, console);
+    Entity::onDraw(match, console);
 
     console.set(position.X, position.Y, color);
 }
@@ -149,9 +156,17 @@ void Hilltop::Game::MissleTrail::onDraw(TankMatch *match, Console::DoublePixelBu
 // Explosion
 //
 
-Hilltop::Game::Explosion::Explosion(int size, int damage) : Projectile(), size(size), damage(damage) {
-    gravity = { 0, 0 };
+Hilltop::Game::Explosion::Explosion(int size, int damage) : Entity(), size(size), damage(damage) {
+    gravityMult = 0.0f;
     coreSize = size - 1;
+}
+
+void Hilltop::Game::Explosion::destroyLand(TankMatch *match) {
+    Vector2 p = position.round();
+    for (int i = p.X - size; i <= p.X + size; i++)
+        for (int j = p.Y - size; j <= p.Y + size; j++)
+            if (distance(Vector2(i, j), p) < size)
+                match->set(i, j, AIR);
 }
 
 std::shared_ptr<Explosion> Hilltop::Game::Explosion::create(int size, int damage) {
@@ -159,21 +174,18 @@ std::shared_ptr<Explosion> Hilltop::Game::Explosion::create(int size, int damage
 }
 
 void Hilltop::Game::Explosion::onTick(TankMatch *match) {
-    Projectile::onTick(match);
+    Entity::onTick(match);
 
-    if (!firstTick) {
+    if (entityAge >= 2) {
         if (willDestroyLand) {
             willDestroyLand = false;
             destroyLand(match);
         }
     }
 
-    ticksLeft--;
-    if (ticksLeft == 0) {
-        ticksLeft = ticksBetween;
-
+    if (entityAge % ticksBetween == 0) {
         if (coreSize <= 1) {
-            match->removeProjectile(*this);
+            match->removeEntity(*this);
         } else {
             coreSize /= 2;
         }
@@ -181,7 +193,7 @@ void Hilltop::Game::Explosion::onTick(TankMatch *match) {
 }
 
 void Hilltop::Game::Explosion::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
-    Projectile::onDraw(match, console);
+    Entity::onDraw(match, console);
 
     Vector2 p = position.round();
     for (int i = p.X - size; i <= p.X + size; i++) {
@@ -205,16 +217,87 @@ void Hilltop::Game::Explosion::onDraw(TankMatch *match, Console::DoublePixelBuff
             }
         }
     }
-
-    firstTick = false;
 }
 
-void Hilltop::Game::Explosion::destroyLand(TankMatch *match) {
+
+
+//
+// TankWheel
+//
+
+bool Hilltop::Game::TankWheel::enableDebug = false;
+
+Hilltop::Game::TankWheel::TankWheel() : Entity() {}
+
+std::shared_ptr<TankWheel> Hilltop::Game::TankWheel::create() {
+    return std::shared_ptr<TankWheel>(new TankWheel());
+}
+
+void Hilltop::Game::TankWheel::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
+    Entity::onDraw(match, console);
+
+    if (!enableDebug)
+        return;
+
     Vector2 p = position.round();
-    for (int i = p.X - size; i <= p.X + size; i++)
-        for (int j = p.Y - size; j <= p.Y + size; j++)
-            if (distance(Vector2(i, j), p) < size)
-                match->set(i, j, AIR);
+    if (entityAge % 2 == 0)
+        console.set(p.X, p.Y, RED);
+}
+
+
+
+//
+// Tank
+//
+
+Hilltop::Game::Tank::Tank(ConsoleColor color) : Entity(), color(color), barrelColor(color) {
+    gravityMult = 0.0f;
+}
+
+std::shared_ptr<Tank> Hilltop::Game::Tank::create(ConsoleColor color) {
+    return std::shared_ptr<Tank>(new Tank(color));
+}
+
+void Hilltop::Game::Tank::initWheels(TankMatch *match) {
+    for (int i = 0; i < 5; i++) {
+        if (!wheels[i]) {
+            wheels[i] = TankWheel::create();
+            wheels[i]->position = { position.X, position.Y + i };
+        }
+        match->addEntity(*wheels[i]);
+    }
+}
+
+void Hilltop::Game::Tank::onTick(TankMatch *match) {
+    Entity::onTick(match);
+
+    float top = wheels[0]->position.X;
+    for (int i = 1; i < 5; i++)
+        top = std::min(top, wheels[i]->position.X);
+    position.X = top;
+
+    for (int i = 0; i < 5; i++)
+        wheels[i]->position = { position.X, position.Y + i };
+}
+
+void Hilltop::Game::Tank::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
+    const static float pi = std::atanf(1) * 4;
+
+    Entity::onDraw(match, console);
+
+    Vector2 p = position.round();
+    for (int i = 0; i < 5; i++)
+        console.set(p.X - 1, p.Y + i, color);
+    for (int i = 1; i < 4; i++)
+        console.set(p.X - 2, p.Y + i, color);
+    
+    float a = angle * pi / 180.0f;
+    foreachPixel(p, p + Vector2(std::sinf(a) * 2.0f, std::cosf(a) * 2.0f),
+        [this, &console, p](Vector2 v)->bool {
+        if (v != p)
+            console.set(v.X - 2, v.Y + 2, barrelColor);
+        return false;
+    });
 }
 
 
@@ -225,26 +308,26 @@ void Hilltop::Game::Explosion::destroyLand(TankMatch *match) {
 
 static const ConsoleColor LAND_COLORS[NUM_LAND_TYPES] = { DARK_BLUE, DARK_GREEN, BROWN, BLACK };
 
-void Hilltop::Game::TankMatch::doProjectileTick() {
-    for (const std::shared_ptr<Projectile> &p : projectiles) {
+void Hilltop::Game::TankMatch::doEntityTick() {
+    for (const std::shared_ptr<Entity> &p : entities) {
         p->onTick(this);
     }
 
-    while (!projectileChanges.empty()) {
-        std::pair<bool, std::shared_ptr<Projectile>> ev = projectileChanges.front();
-        projectileChanges.pop();
+    while (!entityChanges.empty()) {
+        std::pair<bool, std::shared_ptr<Entity>> ev = entityChanges.front();
+        entityChanges.pop();
 
         if (ev.first) {
-            projectiles.push_back(ev.second);
+            entities.push_back(ev.second);
         } else {
-            std::vector<std::shared_ptr<Projectile>>::iterator it =
-                std::find(projectiles.begin(), projectiles.end(), ev.second);
-            if (it != projectiles.end())
-                projectiles.erase(it);
+            std::vector<std::shared_ptr<Entity>>::iterator it =
+                std::find(entities.begin(), entities.end(), ev.second);
+            if (it != entities.end())
+                entities.erase(it);
         }
     }
 
-    for (const std::shared_ptr<Projectile> &p : projectiles) {
+    for (const std::shared_ptr<Entity> &p : entities) {
         Vector2 oldPos = p->position;
         Vector2 newPos = oldPos + p->direction;
         std::pair<bool, Vector2> hit = checkForHit(oldPos, newPos, p->groundHog);
@@ -252,17 +335,17 @@ void Hilltop::Game::TankMatch::doProjectileTick() {
         if (hit.first)
             p->onHit(this);
 
-        p->direction = p->direction + p->gravity;
+        p->direction = p->direction + gravity * p->gravityMult;
 
-        if (p->position.Y < 0 || p->position.Y >= width)
-            removeProjectile(*p);
+        if (p->position.Y < 0 || p->position.Y >= width || p->position.X > height)
+            removeEntity(*p);
     }
 }
 
 Vector2 Hilltop::Game::TankMatch::calcTrajectory(int angle, int power) {
     const static float pi = std::atanf(1) * 4;
     float ang = (float)angle * pi / 180;
-    return Vector2(-std::sinf(ang), std::cosf(ang)) * 8 * ((float)power / 100);
+    return Vector2(-std::sinf(ang), std::cosf(ang)) * 8.0f * ((float)power / 100.0f);
 }
 
 LandType Hilltop::Game::TankMatch::get(int x, int y) {
@@ -286,12 +369,12 @@ void Hilltop::Game::TankMatch::set(int x, int y, LandType type) {
 Hilltop::Game::TankMatch::TankMatch(unsigned short width, unsigned short height)
     : width(width), height(height), map(width * height) {}
 
-void Hilltop::Game::TankMatch::addProjectile(Projectile &projectile) {
-    projectileChanges.push(make_pair(true, projectile.shared_from_this()));
+void Hilltop::Game::TankMatch::addEntity(Entity &entity) {
+    entityChanges.push(make_pair(true, entity.shared_from_this()));
 }
 
-void Hilltop::Game::TankMatch::removeProjectile(Projectile &projectile) {
-    projectileChanges.push(make_pair(false, projectile.shared_from_this()));
+void Hilltop::Game::TankMatch::removeEntity(Entity &entity) {
+    entityChanges.push(make_pair(false, entity.shared_from_this()));
 }
 
 void Hilltop::Game::TankMatch::buildMap(std::function<float(float)> generator) {
@@ -302,7 +385,8 @@ void Hilltop::Game::TankMatch::buildMap(std::function<float(float)> generator) {
     }
 }
 
-std::pair<bool, Vector2> Hilltop::Game::TankMatch::checkForHit(const Vector2 from, const Vector2 to, bool groundHog) {
+std::pair<bool, Vector2> Hilltop::Game::TankMatch::checkForHit(const Vector2 from, const Vector2 to,
+    bool groundHog) {
     std::pair<bool, Vector2> ret = std::make_pair(false, to);
     foreachPixel(from, to, [this, &ret, groundHog](Vector2 p)->bool {
         LandType land = get(p.X, p.Y);
@@ -320,7 +404,7 @@ void Hilltop::Game::TankMatch::draw(Console::DoublePixelBufferedConsole &console
         for (int j = 0; j < width; j++)
             console.set(i, j, LAND_COLORS[get(i, j)]);
 
-    for (const std::shared_ptr<Projectile> &p : projectiles)
+    for (const std::shared_ptr<Entity> &p : entities)
         p->onDraw(this, console);
 }
 
@@ -328,14 +412,14 @@ void Hilltop::Game::TankMatch::doTick(uint64_t tickNumber) {
     if (timeSinceLast == timeBetweenMissles) {
         timeSinceLast = 0;
 
-        std::shared_ptr<Projectile> missle = SimpleTrailedMissile::create(YELLOW, DARK_GRAY, 3);
+        std::shared_ptr<Entity> missle = SimpleTrailedMissile::create(YELLOW, DARK_GRAY, 3);
         missle->position = { 20, (float)width / 2 };
         int angle = scale(rand(), 0, RAND_MAX, 0, 359);
         int power = scale(rand(), 0, RAND_MAX, 20, 80);
         missle->direction = calcTrajectory(angle, power);
-        addProjectile(*missle);
+        addEntity(*missle);
     }
     timeSinceLast++;
 
-    doProjectileTick();
+    doEntityTick();
 }
