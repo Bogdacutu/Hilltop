@@ -71,8 +71,8 @@ namespace Hilltop {
             Entity();
 
         public:
-            Vector2 position;
-            Vector2 direction;
+            Vector2 position = { -1.0f, -1.0f };
+            Vector2 direction = { 0.0f, 0.0f };
             float gravityMult = 1.0f;
 
             bool groundHog = false;
@@ -221,6 +221,7 @@ namespace Hilltop {
 
         public:
             const unsigned short width, height;
+            Console::DoublePixelBufferedConsole canvas;
 
             Vector2 gravity = { 0.15f, 0.0f };
 
@@ -235,7 +236,7 @@ namespace Hilltop {
             void buildMap(std::function<float(float)> generator);
             std::pair<bool, Vector2> checkForHit(const Vector2 from, const Vector2 to, bool groundHog = false);
             
-            void draw(Console::DoublePixelBufferedConsole &console);
+            void draw(Console::Console &console);
 
             void doTick(uint64_t tickNumber);
         };

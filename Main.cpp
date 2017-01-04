@@ -48,14 +48,13 @@ int main() {
 
     std::shared_ptr<BufferedConsoleRegion> mainRegion = BufferedConsoleRegion::create(*console,
         GAME_WIDTH - 2, GAME_HEIGHT - 1, 1, 2);
-    DoublePixelBufferedConsole gamePixels(GAME_WIDTH - 4, GAME_HEIGHT * 2 - 4);
 
     ULONGLONG lastTime = GetTickCount64();
     uint64_t tickNumber = 0;
 
     while (true) {
         ULONGLONG nowTime = GetTickCount64();
-        int ticks = (int)((nowTime - lastTime) / GAME_TICK_MS);
+        int ticks = std::min<int>((int)((nowTime - lastTime) / GAME_TICK_MS), 10);
         if (ticks < 1) {
             Sleep(1);
             continue;
@@ -64,8 +63,7 @@ int main() {
 
         console->clear(WHITE);
 
-        match.draw(gamePixels);
-        gamePixels.commit(*mainRegion);
+        match.draw(*mainRegion);
 
         while (ticks--) {
             match.doTick(++tickNumber);

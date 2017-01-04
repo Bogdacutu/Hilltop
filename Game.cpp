@@ -23,7 +23,7 @@ float Hilltop::Game::distance(const Vector2 from, const Vector2 to) {
 void Hilltop::Game::foreachPixel(const Vector2 from, const Vector2 to, std::function<bool(Vector2)> handler) {
     Vector2 start = from.round();
     Vector2 end = to.round();
-    int steps = std::ceil(std::max(std::abs(start.X - end.X), std::abs(start.Y - end.Y)));
+    int steps = std::max(1, (int)std::ceil(std::max(std::abs(start.X - end.X), std::abs(start.Y - end.Y))));
     Vector2 lastPixel = start;
     for (int i = 0; i <= steps; i++) {
         float pos = scale(i, 0, steps, 0, 1);
@@ -150,7 +150,8 @@ std::shared_ptr<RocketTrail> Hilltop::Game::RocketTrail::create(int maxAge, Cons
 void Hilltop::Game::RocketTrail::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
     Entity::onDraw(match, console);
 
-    console.set(position.X, position.Y, color);
+    Vector2 p = position.round();
+    console.set(p.X, p.Y, color);
 }
 
 
@@ -431,7 +432,7 @@ void Hilltop::Game::TankMatch::set(int x, int y, LandType type) {
 }
 
 Hilltop::Game::TankMatch::TankMatch(unsigned short width, unsigned short height)
-    : width(width), height(height), map(width * height) {}
+    : width(width), height(height), map(width * height), canvas(width, height) {}
 
 void Hilltop::Game::TankMatch::addEntity(Entity &entity) {
     entityChanges.push(make_pair(true, entity.shared_from_this()));
@@ -463,13 +464,22 @@ std::pair<bool, Vector2> Hilltop::Game::TankMatch::checkForHit(const Vector2 fro
     return ret;
 }
 
-void Hilltop::Game::TankMatch::draw(Console::DoublePixelBufferedConsole &console) {
-    for (int i = 0; i < height; i++)
-        for (int j = 0; j < width; j++)
-            console.set(i, j, LAND_COLORS[get(i, j)]);
+void Hilltop::Game::TankMatch::draw(Console::Console &console) {
+    canvas.clear(LAND_COLORS[AIR]);
 
-    for (const std::shared_ptr<Entity> &p : entities)
-        p->onDraw(this, console);
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width; j++) {
+            LandType land = get(i, j);
+            if (land != AIR)
+                canvas.set(i, j, LAND_COLORS[land]);
+        }
+    }
+
+    for (const std::shared_ptr<Entity> &p : entities) {
+        p->onDraw(this, canvas);
+    }
+
+    canvas.commit(console);
 }
 
 void Hilltop::Game::TankMatch::doTick(uint64_t tickNumber) {
