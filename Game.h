@@ -90,42 +90,45 @@ namespace Hilltop {
         };
 
 
-        class SimpleMissle : public Entity {
+        class SimpleRocket : public Entity {
         protected:
-            SimpleMissle(ConsoleColor color);
+            SimpleRocket(ConsoleColor color);
 
         public:
             ConsoleColor color;
 
-            static std::shared_ptr<SimpleMissle> create(ConsoleColor color);
+            bool destroyLand = true;
+            bool createLand = false;
+
+            static std::shared_ptr<SimpleRocket> create(ConsoleColor color);
 
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
             virtual void onHit(TankMatch *match) override;
         };
 
         
-        class SimpleTrailedMissile final : public SimpleMissle {
+        class SimpleTrailedRocket final : public SimpleRocket {
         protected:
-            SimpleTrailedMissile(ConsoleColor color, ConsoleColor trailColor, int trailTime);
+            SimpleTrailedRocket(ConsoleColor color, ConsoleColor trailColor, int trailTime);
 
         public:
             ConsoleColor trailColor;
             int trailTime;
 
-            static std::shared_ptr<SimpleTrailedMissile> create(ConsoleColor color, ConsoleColor trailColor, int trailTime);
+            static std::shared_ptr<SimpleTrailedRocket> create(ConsoleColor color, ConsoleColor trailColor, int trailTime);
 
             virtual void onTick(TankMatch *match) override;
         };
 
 
-        class MissleTrail final : public Entity {
+        class RocketTrail final : public Entity {
         protected:
-            MissleTrail(int maxAge, ConsoleColor color);
+            RocketTrail(int maxAge, ConsoleColor color);
 
         public:
             ConsoleColor color;
 
-            static std::shared_ptr<MissleTrail> create(int maxAge, ConsoleColor color);
+            static std::shared_ptr<RocketTrail> create(int maxAge, ConsoleColor color);
 
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
         };
@@ -138,6 +141,7 @@ namespace Hilltop {
             const int ticksBetween = 2;
 
             void destroyLand(TankMatch *match);
+            void createLand(TankMatch *match);
 
         public:
             const int size;
@@ -145,6 +149,7 @@ namespace Hilltop {
             const int damage;
 
             bool willDestroyLand = false;
+            bool willCreateLand = false;
 
             static std::shared_ptr<Explosion> create(int size, int damage);
 
@@ -179,6 +184,10 @@ namespace Hilltop {
             int angle = 45;
             int power = 50;
 
+            Vector2 getBarrelEnd();
+
+            static Vector2 calcTrajectory(int angle, int power);
+
             static std::shared_ptr<Tank> create(ConsoleColor color);
             static std::shared_ptr<Tank> create(ConsoleColor color, ConsoleColor barrelColor);
             void initWheels(TankMatch *match);
@@ -204,11 +213,11 @@ namespace Hilltop {
             std::vector<std::shared_ptr<Entity>> entities;
             std::queue<std::pair<bool, std::shared_ptr<Entity>>> entityChanges;
 
-            const int timeBetweenMissles = 3;
+            const int timeBetweenRocket = 3;
             int timeSinceLast = 0;
 
             void doEntityTick();
-            Vector2 calcTrajectory(int angle, int power);
+            bool doLandPhysics();
 
         public:
             const unsigned short width, height;

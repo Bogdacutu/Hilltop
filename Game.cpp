@@ -8,6 +8,7 @@ using namespace Hilltop::Console;
 using namespace Hilltop::Game;
 
 
+const static float PI = std::atanf(1) * 4;
 
 
 float Hilltop::Game::scale(float value, float fromLow, float fromHigh, float toLow, float toHigh) {
@@ -71,48 +72,49 @@ void Hilltop::Game::Entity::onExpire(TankMatch *match) {
 
 
 //
-// SimpleMissle
+// SimpleRocket
 //
 
-Hilltop::Game::SimpleMissle::SimpleMissle(ConsoleColor color) : Entity(), color(color) {}
+Hilltop::Game::SimpleRocket::SimpleRocket(ConsoleColor color) : Entity(), color(color) {}
 
-std::shared_ptr<SimpleMissle> Hilltop::Game::SimpleMissle::create(ConsoleColor color) {
-    return std::shared_ptr<SimpleMissle>(new SimpleMissle(color));
+std::shared_ptr<SimpleRocket> Hilltop::Game::SimpleRocket::create(ConsoleColor color) {
+    return std::shared_ptr<SimpleRocket>(new SimpleRocket(color));
 }
 
-void Hilltop::Game::SimpleMissle::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
+void Hilltop::Game::SimpleRocket::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
     Entity::onDraw(match, console);
 
     Vector2 p = position.round();
-    console.set(p.X, p.Y, WHITE);
+    console.set(p.X, p.Y, color);
 }
 
-void Hilltop::Game::SimpleMissle::onHit(TankMatch *match) {
+void Hilltop::Game::SimpleRocket::onHit(TankMatch *match) {
     Entity::onHit(match);
 
     match->removeEntity(*this);
 
     std::shared_ptr<Explosion> ex = Explosion::create(8, 4);
     ex->position = position;
-    ex->willDestroyLand = true;
+    ex->willDestroyLand = destroyLand;
+    ex->willCreateLand = createLand;
     match->addEntity(*ex);
 }
 
 
 
 //
-// SimpleTrailedMissle
+// SimpleTrailedRocket
 //
 
-Hilltop::Game::SimpleTrailedMissile::SimpleTrailedMissile(ConsoleColor color, ConsoleColor trailColor,
-    int trailTime) : SimpleMissle(color), trailColor(trailColor), trailTime(trailTime) {}
+Hilltop::Game::SimpleTrailedRocket::SimpleTrailedRocket(ConsoleColor color, ConsoleColor trailColor,
+    int trailTime) : SimpleRocket(color), trailColor(trailColor), trailTime(trailTime) {}
 
-std::shared_ptr<SimpleTrailedMissile> Hilltop::Game::SimpleTrailedMissile::create(ConsoleColor color, ConsoleColor trailColor, int trailTime) {
-    return std::shared_ptr<SimpleTrailedMissile>(new SimpleTrailedMissile(color, trailColor, trailTime));
+std::shared_ptr<SimpleTrailedRocket> Hilltop::Game::SimpleTrailedRocket::create(ConsoleColor color, ConsoleColor trailColor, int trailTime) {
+    return std::shared_ptr<SimpleTrailedRocket>(new SimpleTrailedRocket(color, trailColor, trailTime));
 }
 
-void Hilltop::Game::SimpleTrailedMissile::onTick(TankMatch *match) {
-    SimpleMissle::onTick(match);
+void Hilltop::Game::SimpleTrailedRocket::onTick(TankMatch *match) {
+    SimpleRocket::onTick(match);
 
     if (!hasHit) {
         Vector2 from = position - match->gravity * gravityMult;
@@ -122,7 +124,7 @@ void Hilltop::Game::SimpleTrailedMissile::onTick(TankMatch *match) {
             if (p.round() == to)
                 return true;
 
-            std::shared_ptr<MissleTrail> trail = MissleTrail::create(trailTime, trailColor);
+            std::shared_ptr<RocketTrail> trail = RocketTrail::create(trailTime, trailColor);
             trail->position = p;
             match->addEntity(*trail);
             return false;
@@ -133,19 +135,19 @@ void Hilltop::Game::SimpleTrailedMissile::onTick(TankMatch *match) {
 
 
 //
-// MissleTrail
+// RocketTrail
 //
 
-Hilltop::Game::MissleTrail::MissleTrail(int maxAge, ConsoleColor color) : Entity(), color(color) {
+Hilltop::Game::RocketTrail::RocketTrail(int maxAge, ConsoleColor color) : Entity(), color(color) {
     maxEntityAge = maxAge;
     gravityMult = 0.0f;
 }
 
-std::shared_ptr<MissleTrail> Hilltop::Game::MissleTrail::create(int maxAge, ConsoleColor color) {
-    return std::shared_ptr<MissleTrail>(new MissleTrail(maxAge, color));
+std::shared_ptr<RocketTrail> Hilltop::Game::RocketTrail::create(int maxAge, ConsoleColor color) {
+    return std::shared_ptr<RocketTrail>(new RocketTrail(maxAge, color));
 }
 
-void Hilltop::Game::MissleTrail::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
+void Hilltop::Game::RocketTrail::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
     Entity::onDraw(match, console);
 
     console.set(position.X, position.Y, color);
@@ -170,6 +172,15 @@ void Hilltop::Game::Explosion::destroyLand(TankMatch *match) {
                 match->set(i, j, AIR);
 }
 
+void Hilltop::Game::Explosion::createLand(TankMatch *match) {
+    Vector2 p = position.round();
+    for (int i = p.X - size; i <= p.X + size; i++)
+        for (int j = p.Y - size; j <= p.Y + size; j++)
+            if (distance(Vector2(i, j), p) < size)
+                if (match->get(i, j) == AIR)
+                    match->set(i, j, DIRT);
+}
+
 std::shared_ptr<Explosion> Hilltop::Game::Explosion::create(int size, int damage) {
     return std::shared_ptr<Explosion>(new Explosion(size, damage));
 }
@@ -181,6 +192,10 @@ void Hilltop::Game::Explosion::onTick(TankMatch *match) {
         if (willDestroyLand) {
             willDestroyLand = false;
             destroyLand(match);
+        }
+        if (willCreateLand) {
+            willCreateLand = false;
+            createLand(match);
         }
     }
 
@@ -256,6 +271,29 @@ Hilltop::Game::Tank::Tank(ConsoleColor color, ConsoleColor barrelColor)
     gravityMult = 0.0f;
 }
 
+Vector2 Hilltop::Game::Tank::getBarrelEnd() {
+    static const float ds2 = std::sqrtf(2.0) * 2.0f;
+
+    float a = angle * PI / 180.0f;
+    Vector2 p = position.round();
+
+    Vector2 c = { std::sinf(a), std::cosf(a) };
+    Vector2 c2 = { c.X * c.X, c.Y * c.Y };
+    Vector2 subterm = { 2.0f + c2.X - c2.Y, 2.0f - c2.X + c2.Y };
+    Vector2 term1 = { subterm.X + c.X * ds2, subterm.Y + c.Y * ds2 };
+    Vector2 term2 = { subterm.X - c.X * ds2, subterm.Y - c.Y * ds2 };
+    Vector2 r = { 0.5f * (std::sqrtf(term1.X) - std::sqrtf(term2.X)),
+        0.5f * (std::sqrtf(term1.Y) - std::sqrtf(term2.Y)) };
+
+    return p + r * 2.0f;
+}
+
+Vector2 Hilltop::Game::Tank::calcTrajectory(int angle, int power) {
+    const static float pi = std::atanf(1) * 4;
+    float ang = (float)angle * pi / 180;
+    return Vector2(-std::sinf(ang), std::cosf(ang)) * 8.0f * ((float)power / 100.0f);
+}
+
 std::shared_ptr<Tank> Hilltop::Game::Tank::create(ConsoleColor color) {
     return std::shared_ptr<Tank>(new Tank(color, color));
 }
@@ -278,12 +316,18 @@ void Hilltop::Game::Tank::onTick(TankMatch *match) {
     Entity::onTick(match);
 
     float top = wheels[0]->position.X;
-    for (int i = 1; i < 5; i++)
+    Vector2 leastDir = wheels[0]->direction;
+    for (int i = 1; i < 5; i++) {
         top = std::min(top, wheels[i]->position.X);
+        if (wheels[i]->direction.X < leastDir.X)
+            leastDir = wheels[i]->direction;
+    }
     position.X = top;
 
-    for (int i = 0; i < 5; i++)
+    for (int i = 0; i < 5; i++) {
         wheels[i]->position = { position.X, position.Y + i };
+        wheels[i]->direction = leastDir;
+    }
 }
 
 void Hilltop::Game::Tank::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
@@ -295,8 +339,7 @@ void Hilltop::Game::Tank::onDraw(TankMatch *match, Console::DoublePixelBufferedC
     
     // draw barrel
     float a = angle * pi / 180.0f;
-    foreachPixel(p, p + Vector2(std::sinf(a) * 2.0f, std::cosf(a) * 2.0f),
-        [this, &console](Vector2 v)->bool {
+    foreachPixel(p, getBarrelEnd(), [this, &console](Vector2 v)->bool {
         console.set(v.X - 2, v.Y + 2, barrelColor);
         return false;
     });
@@ -353,10 +396,20 @@ void Hilltop::Game::TankMatch::doEntityTick() {
     }
 }
 
-Vector2 Hilltop::Game::TankMatch::calcTrajectory(int angle, int power) {
-    const static float pi = std::atanf(1) * 4;
-    float ang = (float)angle * pi / 180;
-    return Vector2(-std::sinf(ang), std::cosf(ang)) * 8.0f * ((float)power / 100.0f);
+bool Hilltop::Game::TankMatch::doLandPhysics() {
+    bool ret = false;
+    for (int i = height - 1; i > 0; i--) {
+        for (int j = 0; j < width; j++) {
+            LandType top = get(i - 1, j);
+            LandType bottom = get(i, j);
+            if (bottom == AIR && top != AIR) {
+                set(i, j, top);
+                set(i - 1, j, AIR);
+                ret = true;
+            }
+        }
+    }
+    return ret;
 }
 
 LandType Hilltop::Game::TankMatch::get(int x, int y) {
@@ -420,17 +473,25 @@ void Hilltop::Game::TankMatch::draw(Console::DoublePixelBufferedConsole &console
 }
 
 void Hilltop::Game::TankMatch::doTick(uint64_t tickNumber) {
-    if (timeSinceLast == timeBetweenMissles) {
+    if (timeSinceLast == timeBetweenRocket) {
         timeSinceLast = 0;
 
-        std::shared_ptr<Entity> missle = SimpleTrailedMissile::create(YELLOW, DARK_GRAY, 3);
-        missle->position = { 20, (float)width / 2 };
+        std::shared_ptr<SimpleRocket> rocket = SimpleTrailedRocket::create(WHITE, DARK_GRAY, 3);
+        rocket->position = { 20, (float)width / 2 };
         int angle = scale(rand(), 0, RAND_MAX, 0, 359);
         int power = scale(rand(), 0, RAND_MAX, 20, 80);
-        missle->direction = calcTrajectory(angle, power);
-        addEntity(*missle);
+        rocket->direction = Tank::calcTrajectory(angle, power);
+        if ((int)scale(rand(), 0, RAND_MAX, 0, 10) == 0) {
+            rocket->destroyLand = false;
+            rocket->createLand = true;
+            rocket->color = BROWN;
+        }
+        addEntity(*rocket);
     }
     timeSinceLast++;
 
+    if (tickNumber % 3 == 0)
+        doLandPhysics();
+    
     doEntityTick();
 }

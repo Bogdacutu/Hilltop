@@ -40,7 +40,7 @@ int main() {
 
     for (int i = 0; i < GAME_WIDTH - 4; i += 10) {
         std::shared_ptr<Tank> tank = Tank::create(BLUE);
-        tank->position = { 10, (float)i };
+        tank->position = { 0, (float)i };
         tank->angle = (i * 2) % 360;
         tank->initWheels(&match);
         match.addEntity(*tank);
@@ -67,8 +67,9 @@ int main() {
         match.draw(gamePixels);
         gamePixels.commit(*mainRegion);
 
-        while (ticks--)
+        while (ticks--) {
             match.doTick(++tickNumber);
+        }
 
         std::ostringstream corner;
         corner << "Tick " << tickNumber;
