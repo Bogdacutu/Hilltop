@@ -491,7 +491,7 @@ void Hilltop::Game::TankMatch::doTick(uint64_t tickNumber) {
         int angle = scale(rand(), 0, RAND_MAX, 0, 359);
         int power = scale(rand(), 0, RAND_MAX, 20, 80);
         rocket->direction = Tank::calcTrajectory(angle, power);
-        if ((int)scale(rand(), 0, RAND_MAX, 0, 10) == 0) {
+        if ((int)scale(rand(), 0, RAND_MAX, 0, 2) == 0) {
             rocket->destroyLand = false;
             rocket->createLand = true;
             rocket->color = BROWN;

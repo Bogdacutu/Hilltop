@@ -67,13 +67,24 @@ namespace Hilltop {
             virtual void handleDraw(Console::BufferedConsoleRegion &region) override;
 
         public:
-            std::function<void()> handler;
-
             Console::ConsoleColor backgroundColor = Console::ConsoleColor::BLACK;
 
             static std::shared_ptr<Button> create();
+        };
 
-            void onClick();
+
+        class ProgressBar final : public Element {
+        protected:
+            ProgressBar();
+
+            virtual void handleDraw(Console::BufferedConsoleRegion &region) override;
+
+        public:
+            float value = 0.5;
+            bool inverted = false;
+            Console::ConsoleColor color = Console::ConsoleColor::WHITE;
+
+            static std::shared_ptr<ProgressBar> create();
         };
     }
 }
