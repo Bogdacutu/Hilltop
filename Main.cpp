@@ -1,6 +1,7 @@
 ﻿#include "Console.h"
 #include "Console.Windows.h"
 #include "Game.h"
+#include "UI.h"
 #include <deque>
 #include <iostream>
 #include <memory>
@@ -12,6 +13,7 @@
 
 using namespace Hilltop::Console;
 using namespace Hilltop::Game;
+using namespace Hilltop::UI;
 
 enum engine_state_t {
     STATE_MENU,
@@ -29,12 +31,7 @@ const unsigned short GAME_HEIGHT = 50;
 
 std::shared_ptr<BufferedConsole> console;
 
-int main() {
-    srand(GetTickCount());
-    AttachConsole(-1);
-
-    console = WindowsConsole::create(GetStdHandle(STD_OUTPUT_HANDLE), GAME_WIDTH, GAME_HEIGHT);
-
+void gameLoop() {
     TankMatch match(GAME_WIDTH - 4, GAME_HEIGHT * 2 - 4);
     match.buildMap([](float x) { return (std::sinf(x * 2 - 1.4f) + 1) / 2 + 0.1f; });
 
@@ -51,6 +48,20 @@ int main() {
 
     ULONGLONG lastTime = GetTickCount64();
     uint64_t tickNumber = 0;
+
+    std::shared_ptr<TextBox> tickCounter = TextBox::create();
+    tickCounter->x = tickCounter->y = 0;
+    tickCounter->width = GAME_WIDTH;
+    tickCounter->height = 1;
+    tickCounter->color = BLACK;
+    tickCounter->alignment = CENTER;
+
+    std::shared_ptr<ElementCollection> bottomArea = ElementCollection::create();
+    bottomArea->x = GAME_HEIGHT;
+    bottomArea->y = 2;
+    bottomArea->width = GAME_WIDTH - 4;
+    bottomArea->height = 12;
+    bottomArea->drawBackground = true;
 
     while (true) {
         ULONGLONG nowTime = GetTickCount64();
@@ -69,10 +80,22 @@ int main() {
             match.doTick(++tickNumber);
         }
 
-        std::ostringstream corner;
-        corner << "Tick " << tickNumber;
-        printText(console.get(), 0, 0, GAME_WIDTH, 1, corner.str(), BLACK, CENTER, false);
+        std::ostringstream tickCounterText;
+        tickCounterText << "Tick " << tickNumber;
+        tickCounter->text = tickCounterText.str();
+        tickCounter->draw(*console);
+
+        bottomArea->draw(*console);
 
         console->commit();
     }
+}
+
+int main() {
+    srand(GetTickCount());
+    AttachConsole(-1);
+
+    console = WindowsConsole::create(GetStdHandle(STD_OUTPUT_HANDLE), GAME_WIDTH, GAME_HEIGHT + 13);
+
+    gameLoop();
 }
