@@ -29,7 +29,18 @@ const unsigned short MENU_HEIGHT = 25;
 const unsigned short GAME_WIDTH = 200;
 const unsigned short GAME_HEIGHT = 50;
 
+const std::string FIRE_TEXT = "    ______________  ________\n   / ____/  _/ __ \\/ ____/ /\n  / /_   / // /_/ / __/ / / \n / __/ _/ // _, _/ /___/_/  \n/_/   /___/_/ |_/_____(_)   ";
+
 std::shared_ptr<BufferedConsole> console;
+
+static void preventResizeWindow() {
+    HWND window = GetConsoleWindow();
+    HMENU menu = GetSystemMenu(window, FALSE);
+    DeleteMenu(menu, SC_SIZE, MF_BYCOMMAND);
+    DeleteMenu(menu, SC_MAXIMIZE, MF_BYCOMMAND);
+    LONG style = GetWindowLong(window, GWL_STYLE);
+    SetWindowLong(window, GWL_STYLE, style & ~WS_SIZEBOX);
+}
 
 void gameLoop() {
     TankMatch match(GAME_WIDTH - 4, GAME_HEIGHT * 2 - 4);
@@ -63,6 +74,34 @@ void gameLoop() {
     bottomArea->height = 12;
     bottomArea->drawBackground = true;
 
+    std::shared_ptr<ElementCollection> leftArea = ElementCollection::create();
+    leftArea->width = bottomArea->width / 3;
+    leftArea->height = bottomArea->height;
+    leftArea->x = 0;
+    leftArea->y = 0;
+    leftArea->backgroundColor = GREEN;
+    leftArea->drawBackground = true;
+    bottomArea->addChild(*leftArea);
+
+    std::shared_ptr<ElementCollection> rightArea = ElementCollection::create();
+    rightArea->width = bottomArea->width / 3;
+    rightArea->height = bottomArea->height;
+    rightArea->x = 0;
+    rightArea->y = bottomArea->width - rightArea->width;
+    rightArea->backgroundColor = ORANGE;
+    rightArea->drawBackground = true;
+    bottomArea->addChild(*rightArea);
+
+    std::shared_ptr<Button> fireButton = Button::create();
+    fireButton->width = bottomArea->width - leftArea->width - rightArea->width - 8;
+    fireButton->height = bottomArea->height - 4;
+    fireButton->x = 2;
+    fireButton->y = leftArea->width + 4;
+    fireButton->backgroundColor = RED;
+    fireButton->color = WHITE;
+    fireButton->text = FIRE_TEXT;
+    bottomArea->addChild(*fireButton);
+
     while (true) {
         ULONGLONG nowTime = GetTickCount64();
         int ticks = std::min<int>((int)((nowTime - lastTime) / GAME_TICK_MS), 10);
@@ -93,7 +132,9 @@ void gameLoop() {
 
 int main() {
     srand(GetTickCount());
+
     AttachConsole(-1);
+    preventResizeWindow();
 
     console = WindowsConsole::create(GetStdHandle(STD_OUTPUT_HANDLE), GAME_WIDTH, GAME_HEIGHT + 13);
 

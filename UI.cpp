@@ -30,9 +30,11 @@ void Hilltop::UI::Element::draw(Console::BufferedConsole &console) {
 // ElementCollection
 //
 
-Hilltop::UI::ElementCollection::ElementCollection() {}
+Hilltop::UI::ElementCollection::ElementCollection() : Element() {}
 
 void Hilltop::UI::ElementCollection::handleDraw(Console::BufferedConsoleRegion &region) {
+    Element::handleDraw(region);
+
     if (drawBackground)
         region.clear(backgroundColor);
 
@@ -65,12 +67,40 @@ std::shared_ptr<ElementCollection> Hilltop::UI::ElementCollection::create() {
 // TextBox
 //
 
-Hilltop::UI::TextBox::TextBox() {}
+Hilltop::UI::TextBox::TextBox() : Element() {}
 
 void Hilltop::UI::TextBox::handleDraw(Console::BufferedConsoleRegion &region) {
-    printText(&region, x, y, width, height, text, color, alignment, wordWrap);
+    Element::handleDraw(region);
+
+    TextBoxSize size = printText(nullptr, 0, 0, width, height, text, color, alignment, wordWrap);
+    printText(&region, (height - size.lines) / 2, 0, width, height, text, color, alignment, wordWrap);
 }
 
 std::shared_ptr<TextBox> Hilltop::UI::TextBox::create() {
     return std::shared_ptr<TextBox>(new TextBox());
+}
+
+
+
+//
+// Button
+//
+
+Hilltop::UI::Button::Button() : TextBox() {
+    alignment = CENTER;
+}
+
+void Hilltop::UI::Button::handleDraw(Console::BufferedConsoleRegion &region) {
+    region.clear(backgroundColor);
+
+    TextBox::handleDraw(region);
+}
+
+std::shared_ptr<Button> Hilltop::UI::Button::create() {
+    return std::shared_ptr<Button>(new Button());
+}
+
+void Hilltop::UI::Button::onClick() {
+    if (handler)
+        handler();
 }

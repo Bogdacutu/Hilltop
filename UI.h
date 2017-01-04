@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Console.h"
+#include <functional>
 #include <memory>
 
 namespace Hilltop {
@@ -15,6 +16,7 @@ namespace Hilltop {
         public:
             unsigned short width, height;
             unsigned short x, y;
+            bool active = false;
 
             static std::shared_ptr<Element> create();
 
@@ -42,7 +44,7 @@ namespace Hilltop {
         };
 
 
-        class TextBox final : public Element {
+        class TextBox : public Element {
         protected:
             TextBox();
 
@@ -55,6 +57,23 @@ namespace Hilltop {
             bool wordWrap = true;
 
             static std::shared_ptr<TextBox> create();
+        };
+
+
+        class Button final : public TextBox {
+        protected:
+            Button();
+
+            virtual void handleDraw(Console::BufferedConsoleRegion &region) override;
+
+        public:
+            std::function<void()> handler;
+
+            Console::ConsoleColor backgroundColor = Console::ConsoleColor::BLACK;
+
+            static std::shared_ptr<Button> create();
+
+            void onClick();
         };
     }
 }

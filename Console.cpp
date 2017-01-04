@@ -119,10 +119,11 @@ TextBoxSize Hilltop::Console::printText(BufferedConsole *buffer, unsigned short 
         std::deque<std::string> words;
         {
             std::istringstream lineInput(lineIn);
-            while (lineInput >> word)
+            while (std::getline(lineInput, word, ' '))
                 words.push_back(word);
         }
         bool hadWords = words.size() > 0;
+        bool firstWord = true;
 
         while (words.size()) {
             word = words.front();
@@ -139,8 +140,12 @@ TextBoxSize Hilltop::Console::printText(BufferedConsole *buffer, unsigned short 
                     break;
                 lineOut.clear();
             }
-            if (lineOut.length())
+
+            if (!firstWord) {
                 lineOut += ' ';
+            } else {
+                firstWord = false;
+            }
             lineOut += word;
         }
 

@@ -34,8 +34,19 @@ static bool resizeWithAutoFont(HANDLE buffer, unsigned short width, unsigned sho
         setConsoleFontSize(buffer, i);
         setConsoleSize(buffer, width, height);
         getConsoleSize(buffer, &w, &h);
-        if (w == width && h == height)
+        if (w == width && h == height) {
+            HWND window = GetConsoleWindow();
+            RECT pos;
+            GetWindowRect(window, &pos);
+            int width = pos.right - pos.left;
+            int height = pos.bottom - pos.top;
+            HMONITOR monitor = MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY);
+            MONITORINFO info = { sizeof(MONITORINFO) };
+            GetMonitorInfo(monitor, &info);
+            int monWidth = info.rcMonitor.right - info.rcMonitor.left;
+            SetWindowPos(window, HWND_TOP, (monWidth - width) / 2, 0, width, height, 0);
             return true;
+        }
     }
     return false;
 }
