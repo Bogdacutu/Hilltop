@@ -5,6 +5,7 @@
 
 using namespace Hilltop::Console;
 
+
 ConsoleColor Hilltop::Console::make_color(ConsoleColor background, ConsoleColor foreground) {
     return (ConsoleColor)(((background << BACKGROUND_SHIFT) & BACKGROUND_COLOR)
         | ((foreground << FOREGROUND_SHIFT) & FOREGROUND_COLOR));
@@ -22,6 +23,12 @@ ConsoleColor Hilltop::Console::calc_masked_color(ConsoleColor old, ConsoleColor 
     return (ConsoleColor)((old & ~mask) | (color & mask));
 }
 
+
+
+//
+// Console
+//
+
 Hilltop::Console::Console::Console(unsigned short width, unsigned short height)
     : width(width), height(height) {}
 
@@ -32,12 +39,24 @@ void Hilltop::Console::Console::clear(ConsoleColor color) {
             set(i, j, ' ', color);
 }
 
+
+
+//
+// BufferedConsole
+//
+
 Hilltop::Console::BufferedConsole::BufferedConsole(unsigned short width, unsigned short height)
     : Console(width, height) {}
 
 void Hilltop::Console::BufferedConsole::set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color) {
     set(x, y, ch, color, (ConsoleColorType)(BACKGROUND_COLOR | FOREGROUND_COLOR));
 }
+
+
+
+//
+// BufferedConsoleRegion
+//
 
 Hilltop::Console::BufferedConsoleRegion::BufferedConsoleRegion(BufferedConsole &console,
     unsigned short width, unsigned short height, unsigned short x, unsigned short y)
@@ -65,6 +84,12 @@ void Hilltop::Console::BufferedConsoleRegion::set(unsigned short x, unsigned sho
 
     console->set(this->x + x, this->y + y, ch, color, colorMask);
 }
+
+
+
+//
+// DoublePixelBufferedConsole
+//
 
 const uint8_t Hilltop::Console::DoublePixelBufferedConsole::BIT_MASKS[2] = { 0xf0, 0xf };
 const int Hilltop::Console::DoublePixelBufferedConsole::BIT_SHIFTS[2] = { 4, 0 };
@@ -107,6 +132,8 @@ void Hilltop::Console::DoublePixelBufferedConsole::commit(Console &buffer) const
         }
     }
 }
+
+
 
 TextBoxSize Hilltop::Console::printText(BufferedConsole *buffer, unsigned short x, unsigned short y,
     unsigned short width, unsigned short height, std::string text, ConsoleColor color, TextAlignment align,

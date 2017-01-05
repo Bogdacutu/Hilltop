@@ -4,6 +4,8 @@
 
 using namespace Hilltop::Console;
 
+
+
 static void setConsoleFontSize(HANDLE buffer, unsigned short size) {
     CONSOLE_FONT_INFOEX info = { sizeof(info) };
     GetCurrentConsoleFontEx(buffer, FALSE, &info);
@@ -80,6 +82,12 @@ static void setGameBufferProps(HANDLE buffer) {
     cursorInfo.bVisible = FALSE;
     SetConsoleCursorInfo(buffer, &cursorInfo);
 }
+
+
+
+//
+// WindowsConsole
+//
 
 Hilltop::Console::WindowsConsole::WindowsConsole(HANDLE handle, unsigned short width, unsigned short height,
     unsigned short minFont, unsigned short maxFont) : BufferedConsole(width, height), handle(handle) {

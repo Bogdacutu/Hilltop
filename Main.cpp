@@ -21,7 +21,6 @@ enum engine_state_t {
 };
 
 engine_state_t state = STATE_INGAME;
-bool consoleEnabled = false;
 
 const unsigned short MENU_WIDTH = 80;
 const unsigned short MENU_HEIGHT = 25;
@@ -32,6 +31,22 @@ const unsigned short GAME_HEIGHT = 50;
 const std::string FIRE_TEXT = "    ______________  ________\n   / ____/  _/ __ \\/ ____/ /\n  / /_   / // /_/ / __/ / / \n / __/ _/ // _, _/ /___/_/  \n/_/   /___/_/ |_/_____(_)   ";
 
 std::shared_ptr<BufferedConsole> console;
+
+std::shared_ptr<ElementCollection> weaponArea;
+std::shared_ptr<ElementCollection> moveArea;
+std::shared_ptr<Button> fireButton;
+std::shared_ptr<ElementCollection> powerArea;
+std::shared_ptr<ElementCollection> angleArea;
+
+enum {
+    WEAPON_AREA,
+    MOVE_AREA,
+    FIRE_BUTTON_TOP,
+    FIRE_BUTTON_BOTTOM,
+    ANGLE_AREA,
+    POWER_AREA,
+    NUM_GAME_CONTROL_AREAS
+} GameControlArea;
 
 static void preventResizeWindow() {
     HWND window = GetConsoleWindow();
@@ -50,7 +65,7 @@ static void buildGameUI(ElementCollection *bottomArea) {
     leftArea->y = 0;
     bottomArea->addChild(*leftArea);
 
-    std::shared_ptr<ElementCollection> moveArea = ElementCollection::create();
+    moveArea = ElementCollection::create();
     moveArea->width = leftArea->width - 6;
     moveArea->height = 3;
     moveArea->x = leftArea->height - moveArea->height - 2;
@@ -89,7 +104,7 @@ static void buildGameUI(ElementCollection *bottomArea) {
     moveText->alignment = CENTER;
     moveArea->addChild(*moveText);
 
-    std::shared_ptr<ElementCollection> weaponArea = ElementCollection::create();
+    weaponArea = ElementCollection::create();
     weaponArea->width = leftArea->width - 6;
     weaponArea->height = 3;
     weaponArea->x = 2;
@@ -152,7 +167,7 @@ static void buildGameUI(ElementCollection *bottomArea) {
     rightArea->y = bottomArea->width - rightArea->width;
     bottomArea->addChild(*rightArea);
 
-    std::shared_ptr<Button> fireButton = Button::create();
+    fireButton = Button::create();
     fireButton->width = bottomArea->width - leftArea->width - rightArea->width - 8;
     fireButton->height = bottomArea->height - 4;
     fireButton->x = 2;
@@ -162,7 +177,7 @@ static void buildGameUI(ElementCollection *bottomArea) {
     fireButton->text = FIRE_TEXT;
     bottomArea->addChild(*fireButton);
 
-    std::shared_ptr<ElementCollection> powerArea = ElementCollection::create();
+    powerArea = ElementCollection::create();
     powerArea->width = rightArea->width - 6;
     powerArea->height = 3;
     powerArea->x = rightArea->height - powerArea->height - 2;
@@ -186,7 +201,7 @@ static void buildGameUI(ElementCollection *bottomArea) {
     powerBgText->y = 0;
     powerBgText->backgroundColor = GRAY;
     powerBgText->color = DARK_GRAY;
-    powerBgText->text = std::string(" <") + std::string(powerArea->width - 4, ' ') + std::string("> ");
+    powerBgText->text = std::string("  <") + std::string(powerArea->width - 6, ' ') + std::string(">  ");
     powerArea->addChild(*powerBgText);
 
     std::shared_ptr<TextBox> powerText = TextBox::create();
@@ -199,7 +214,7 @@ static void buildGameUI(ElementCollection *bottomArea) {
     powerText->alignment = CENTER;
     powerArea->addChild(*powerText);
 
-    std::shared_ptr<ElementCollection> angleArea = ElementCollection::create();
+    angleArea = ElementCollection::create();
     angleArea->width = rightArea->width - 6;
     angleArea->height = 3;
     angleArea->x = 2;
@@ -234,7 +249,7 @@ static void buildGameUI(ElementCollection *bottomArea) {
     angleBgText->y = 0;
     angleBgText->backgroundColor = GRAY;
     angleBgText->color = DARK_GRAY;
-    angleBgText->text = std::string(" <") + std::string(angleArea->width - 4, ' ') + std::string("> ");
+    angleBgText->text = std::string("  <") + std::string(angleArea->width - 6, ' ') + std::string(">   ");
     angleArea->addChild(*angleBgText);
 
     std::shared_ptr<TextBox> angleText = TextBox::create();
@@ -282,6 +297,28 @@ static void gameLoop() {
 
     buildGameUI(bottomArea.get());
 
+    Form gameForm(NUM_GAME_CONTROL_AREAS);
+    gameForm.elements[WEAPON_AREA] = weaponArea;
+    gameForm.elements[MOVE_AREA] = moveArea;
+    gameForm.elements[FIRE_BUTTON_TOP] = fireButton;
+    gameForm.elements[FIRE_BUTTON_BOTTOM] = fireButton;
+    gameForm.elements[ANGLE_AREA] = angleArea;
+    gameForm.elements[POWER_AREA] = powerArea;
+    gameForm.mapping[WEAPON_AREA].bottom = MOVE_AREA;
+    gameForm.mapping[WEAPON_AREA].right = FIRE_BUTTON_TOP;
+    gameForm.mapping[MOVE_AREA].top = WEAPON_AREA;
+    gameForm.mapping[MOVE_AREA].right = FIRE_BUTTON_BOTTOM;
+    gameForm.mapping[FIRE_BUTTON_TOP].bottom = FIRE_BUTTON_BOTTOM;
+    gameForm.mapping[FIRE_BUTTON_TOP].left = WEAPON_AREA;
+    gameForm.mapping[FIRE_BUTTON_TOP].right = ANGLE_AREA;
+    gameForm.mapping[FIRE_BUTTON_BOTTOM].top = FIRE_BUTTON_TOP;
+    gameForm.mapping[FIRE_BUTTON_BOTTOM].left = MOVE_AREA;
+    gameForm.mapping[FIRE_BUTTON_BOTTOM].right = POWER_AREA;
+    gameForm.mapping[ANGLE_AREA].bottom = POWER_AREA;
+    gameForm.mapping[ANGLE_AREA].left = FIRE_BUTTON_TOP;
+    gameForm.mapping[POWER_AREA].top = ANGLE_AREA;
+    gameForm.mapping[POWER_AREA].left = FIRE_BUTTON_BOTTOM;
+    
     while (true) {
         ULONGLONG nowTime = GetTickCount64();
         int ticks = std::min<int>((int)((nowTime - lastTime) / GAME_TICK_MS), 10);
@@ -297,6 +334,7 @@ static void gameLoop() {
 
         while (ticks--) {
             match.doTick(++tickNumber);
+            gameForm.tick();
         }
 
         std::ostringstream tickCounterText;
@@ -305,6 +343,7 @@ static void gameLoop() {
         tickCounter->draw(*console);
 
         bottomArea->draw(*console);
+        gameForm.draw(*console, *bottomArea);
 
         console->commit();
     }
