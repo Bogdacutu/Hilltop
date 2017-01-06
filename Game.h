@@ -229,9 +229,6 @@ namespace Hilltop {
             std::vector<std::shared_ptr<Entity>> entities;
             std::queue<std::pair<bool, std::shared_ptr<Entity>>> entityChanges;
 
-            static const int timeBetweenRocket = 100;
-            int timeSinceLast = 0;
-
             static const int recentUpdateCount = 10;
             bool recentUpdateResult[10] = {};
 
@@ -248,6 +245,7 @@ namespace Hilltop {
             Vector2 gravity = { 0.15f, 0.0f };
             bool updateMattered = false;
             uint64_t tickNumber = 0;
+            bool isAiming = true;
 
             TankMatch(unsigned short width, unsigned short height);
 

@@ -23,6 +23,14 @@ ConsoleColor Hilltop::Console::calc_masked_color(ConsoleColor old, ConsoleColor 
     return (ConsoleColor)((old & ~mask) | (color & mask));
 }
 
+bool Hilltop::Console::is_bright_color(ConsoleColor color) {
+    return color >= GRAY;
+}
+
+bool Hilltop::Console::is_dark_color(ConsoleColor color) {
+    return color <= DARK_GRAY;
+}
+
 
 
 //

@@ -38,6 +38,9 @@ namespace Hilltop {
         ConsoleColor make_fg_color(ConsoleColor foreground);
         ConsoleColor calc_masked_color(ConsoleColor old, ConsoleColor color, ConsoleColorType mask);
 
+        bool is_bright_color(ConsoleColor color);
+        bool is_dark_color(ConsoleColor color);
+
 
         class Console : public std::enable_shared_from_this<Console> {
         protected:

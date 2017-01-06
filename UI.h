@@ -120,6 +120,7 @@ namespace Hilltop {
             } mapping_t;
 
             typedef struct {
+                Form &form;
                 EventType type;
                 int position;
                 KEY_EVENT_RECORD record;
@@ -144,6 +145,8 @@ namespace Hilltop {
 
             void tick();
             void draw(Console::BufferedConsole &console, ElementCollection &elements);
+
+            static void drainInputQueue();
         };
     }
 }

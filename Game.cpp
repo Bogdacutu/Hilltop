@@ -528,23 +528,6 @@ void Hilltop::Game::TankMatch::doTick() {
     tickNumber++;
     updateMattered = false;
 
-    if (timeSinceLast == timeBetweenRocket) {
-        timeSinceLast = 0;
-
-        std::shared_ptr<SimpleRocket> rocket = SimpleTrailedRocket::create(WHITE, DARK_GRAY, 3);
-        rocket->position = { 20, (float)width / 2 };
-        int angle = scale(rand(), 0, RAND_MAX, 0, 359);
-        int power = scale(rand(), 0, RAND_MAX, 20, 80);
-        rocket->direction = Tank::calcTrajectory(angle, power);
-        if ((int)scale(rand(), 0, RAND_MAX, 0, 2) == 0) {
-            rocket->destroyLand = false;
-            rocket->createLand = true;
-            rocket->color = BROWN;
-        }
-        addEntity(*rocket);
-    }
-    timeSinceLast++;
-
     if (tickNumber % 3 == 0)
         updateMattered |= doLandPhysics();
     
@@ -558,6 +541,14 @@ bool Hilltop::Game::TankMatch::recentUpdatesMattered() {
         if (recentUpdateResult[i])
             return true;
     return false;
+}
+
+void Hilltop::Game::TankMatch::fire() {
+    std::shared_ptr<SimpleRocket> rocket = SimpleTrailedRocket::create(WHITE, DARK_GRAY, 3);
+    rocket->position = players[currentPlayer]->tank->getBarrelEnd();
+    rocket->direction = Tank::calcTrajectory(players[currentPlayer]->tank->angle,
+        players[currentPlayer]->tank->power);
+    addEntity(*rocket);
 }
 
 int Hilltop::Game::TankMatch::getNextPlayer() {

@@ -194,7 +194,7 @@ Hilltop::UI::Form::Form(int numElements)
     : mapping(numElements), actions(numElements), elements(numElements) {}
 
 bool Hilltop::UI::Form::doAction(KEY_EVENT_RECORD record) {
-    event_args_t args;
+    event_args_t args{ *this };
 
     args.type = KEY;
     args.position = currentPos;
@@ -207,7 +207,7 @@ bool Hilltop::UI::Form::doAction(KEY_EVENT_RECORD record) {
 }
 
 bool Hilltop::UI::Form::doAction(bool focused) {
-    event_args_t args;
+    event_args_t args{ *this };
 
     args.type = focused ? FOCUS : BLUR;
 
@@ -326,5 +326,19 @@ void Hilltop::UI::Form::draw(Console::BufferedConsole &console, ElementCollectio
             drawThinOuterRectangle(console, elements[currentPos]->width + 4,
                 elements[currentPos]->height + 2, x - 1, y - 2, c);
         }
+    }
+}
+
+void Hilltop::UI::Form::drainInputQueue() {
+    HANDLE handle = GetStdHandle(STD_INPUT_HANDLE);
+
+    while (true) {
+        DWORD numEvents = 0;
+        GetNumberOfConsoleInputEvents(handle, &numEvents);
+        if (numEvents <= 0)
+            break;
+
+        INPUT_RECORD input = {};
+        ReadConsoleInput(handle, &input, 1, &numEvents);
     }
 }

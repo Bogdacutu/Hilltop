@@ -49,6 +49,7 @@ std::shared_ptr<ProgressBar> powerBar;
 std::shared_ptr<TextBox> powerText;
 
 std::shared_ptr<TankMatch> match;
+std::shared_ptr<Form> gameForm;
 
 enum {
     WEAPON_AREA,
@@ -285,6 +286,10 @@ static bool angleAreaAction(Form::event_args_t e) {
     case VK_RIGHT:
         delta = -deltaPerTick;
         break;
+    case VK_RETURN:
+    case VK_SPACE:
+        e.form.isFocused = false;
+        return true;
     }
 
     int angle = match->players[match->currentPlayer]->tank->angle;
@@ -303,6 +308,10 @@ static void angleAreaUpdate() {
     angleText->text = text.str();
     angleProgressTop->value = (float)std::min(180, angle) / 180.0f;
     angleProgressBottom->value = (float)std::max(0, angle - 180) / 179.0f;
+
+    ConsoleColor color = match->players[match->currentPlayer]->tank->color;
+    angleProgressTop->color = color;
+    angleProgressBottom->color = color;
 }
 
 static bool powerAreaAction(Form::event_args_t e) {
@@ -317,6 +326,10 @@ static bool powerAreaAction(Form::event_args_t e) {
     case VK_RIGHT:
         delta = deltaPerTick;
         break;
+    case VK_RETURN:
+    case VK_SPACE:
+        e.form.isFocused = false;
+        return true;
     }
 
     int power = match->players[match->currentPlayer]->tank->power;
@@ -332,6 +345,24 @@ static void powerAreaUpdate() {
     text << "Power: " << power << "%";
     powerText->text = text.str();
     powerBar->value = (float)power / 100.0f;
+
+    ConsoleColor color = match->players[match->currentPlayer]->tank->color;
+    powerBar->color = color;
+}
+
+static bool fireButtonAction(Form::event_args_t e) {
+    match->fire();
+    match->isAiming = false;
+    match->doTick();
+    e.form.currentPos = 0;
+    e.form.isFocused = false;
+    return true;
+}
+
+static void fireButtonUpdate() {
+    ConsoleColor color = match->players[match->currentPlayer]->tank->barrelColor;
+    fireButton->backgroundColor = color;
+    fireButton->color = is_bright_color(color) ? BLACK : WHITE;
 }
 
 static void gameLoop() {
@@ -371,29 +402,31 @@ static void gameLoop() {
 
     buildGameUI(bottomArea.get());
 
-    Form gameForm(NUM_GAME_CONTROL_AREAS);
-    gameForm.elements[WEAPON_AREA] = weaponArea;
-    gameForm.elements[MOVE_AREA] = moveArea;
-    gameForm.elements[FIRE_BUTTON_TOP] = fireButton;
-    gameForm.elements[FIRE_BUTTON_BOTTOM] = fireButton;
-    gameForm.elements[ANGLE_AREA] = angleArea;
-    gameForm.elements[POWER_AREA] = powerArea;
-    gameForm.mapping[WEAPON_AREA].bottom = MOVE_AREA;
-    gameForm.mapping[WEAPON_AREA].right = FIRE_BUTTON_TOP;
-    gameForm.mapping[MOVE_AREA].top = WEAPON_AREA;
-    gameForm.mapping[MOVE_AREA].right = FIRE_BUTTON_BOTTOM;
-    gameForm.mapping[FIRE_BUTTON_TOP].bottom = FIRE_BUTTON_BOTTOM;
-    gameForm.mapping[FIRE_BUTTON_TOP].left = WEAPON_AREA;
-    gameForm.mapping[FIRE_BUTTON_TOP].right = ANGLE_AREA;
-    gameForm.mapping[FIRE_BUTTON_BOTTOM].top = FIRE_BUTTON_TOP;
-    gameForm.mapping[FIRE_BUTTON_BOTTOM].left = MOVE_AREA;
-    gameForm.mapping[FIRE_BUTTON_BOTTOM].right = POWER_AREA;
-    gameForm.mapping[ANGLE_AREA].bottom = POWER_AREA;
-    gameForm.mapping[ANGLE_AREA].left = FIRE_BUTTON_TOP;
-    gameForm.mapping[POWER_AREA].top = ANGLE_AREA;
-    gameForm.mapping[POWER_AREA].left = FIRE_BUTTON_BOTTOM;
-    gameForm.actions[ANGLE_AREA] = angleAreaAction;
-    gameForm.actions[POWER_AREA] = powerAreaAction;
+    gameForm = std::make_shared<Form>(NUM_GAME_CONTROL_AREAS);
+    gameForm->elements[WEAPON_AREA] = weaponArea;
+    gameForm->elements[MOVE_AREA] = moveArea;
+    gameForm->elements[FIRE_BUTTON_TOP] = fireButton;
+    gameForm->elements[FIRE_BUTTON_BOTTOM] = fireButton;
+    gameForm->elements[ANGLE_AREA] = angleArea;
+    gameForm->elements[POWER_AREA] = powerArea;
+    gameForm->mapping[WEAPON_AREA].bottom = MOVE_AREA;
+    gameForm->mapping[WEAPON_AREA].right = FIRE_BUTTON_TOP;
+    gameForm->mapping[MOVE_AREA].top = WEAPON_AREA;
+    gameForm->mapping[MOVE_AREA].right = FIRE_BUTTON_BOTTOM;
+    gameForm->mapping[FIRE_BUTTON_TOP].bottom = FIRE_BUTTON_BOTTOM;
+    gameForm->mapping[FIRE_BUTTON_TOP].left = WEAPON_AREA;
+    gameForm->mapping[FIRE_BUTTON_TOP].right = ANGLE_AREA;
+    gameForm->mapping[FIRE_BUTTON_BOTTOM].top = FIRE_BUTTON_TOP;
+    gameForm->mapping[FIRE_BUTTON_BOTTOM].left = MOVE_AREA;
+    gameForm->mapping[FIRE_BUTTON_BOTTOM].right = POWER_AREA;
+    gameForm->mapping[ANGLE_AREA].bottom = POWER_AREA;
+    gameForm->mapping[ANGLE_AREA].left = FIRE_BUTTON_TOP;
+    gameForm->mapping[POWER_AREA].top = ANGLE_AREA;
+    gameForm->mapping[POWER_AREA].left = FIRE_BUTTON_BOTTOM;
+    gameForm->actions[FIRE_BUTTON_TOP] = fireButtonAction;
+    gameForm->actions[FIRE_BUTTON_BOTTOM] = fireButtonAction;
+    gameForm->actions[ANGLE_AREA] = angleAreaAction;
+    gameForm->actions[POWER_AREA] = powerAreaAction;
 
     // settle tanks
     do {
@@ -414,8 +447,12 @@ static void gameLoop() {
         match->draw(*mainRegion);
 
         while (ticks--) {
-            match->doTick();
-            gameForm.tick();
+            if (!match->isAiming) {
+                match->doTick();
+                Form::drainInputQueue();
+            } else {
+                gameForm->tick();
+            }
         }
 
         std::ostringstream tickCounterText;
@@ -423,15 +460,19 @@ static void gameLoop() {
         tickCounter->text = tickCounterText.str();
         tickCounter->draw(*console);
 
+        fireButtonUpdate();
         angleAreaUpdate();
         powerAreaUpdate();
 
         bottomArea->draw(*console);
 
-        if (match->recentUpdatesMattered()) {
-            console->set(0, 0, L' ', make_bg_color(RED));
-        } else {
-            gameForm.draw(*console, *bottomArea);
+        if (!match->recentUpdatesMattered()) {
+            if (match->isAiming) {
+                gameForm->draw(*console, *bottomArea);
+            } else {
+                match->isAiming = true;
+                match->currentPlayer = match->getNextPlayer();
+            }
         }
 
         console->commit();
