@@ -193,7 +193,7 @@ static void drawThinOuterRectangle(BufferedConsole &console, unsigned short widt
 Hilltop::UI::Form::Form(int numElements)
     : mapping(numElements), actions(numElements), elements(numElements) {}
 
-void Hilltop::UI::Form::doAction(KEY_EVENT_RECORD record) {
+bool Hilltop::UI::Form::doAction(KEY_EVENT_RECORD record) {
     event_args_t args;
 
     args.type = KEY;
@@ -201,16 +201,20 @@ void Hilltop::UI::Form::doAction(KEY_EVENT_RECORD record) {
     args.record = record;
 
     if (actions[currentPos])
-        actions[currentPos](args);
+        return actions[currentPos](args);
+
+    return false;
 }
 
-void Hilltop::UI::Form::doAction(bool focused) {
+bool Hilltop::UI::Form::doAction(bool focused) {
     event_args_t args;
 
     args.type = focused ? FOCUS : BLUR;
 
     if (actions[currentPos])
-        actions[currentPos](args);
+        return actions[currentPos](args);
+
+    return false;
 }
 
 void Hilltop::UI::Form::doDirectionSwitch(KEY_EVENT_RECORD record, Direction direction) {
@@ -251,10 +255,15 @@ void Hilltop::UI::Form::handleKeyEvent(KEY_EVENT_RECORD record) {
         return;
 
     if (isFocused) {
-        if (record.wVirtualKeyCode == VK_ESCAPE) {
+        switch (record.wVirtualKeyCode) {
+        case VK_BACK:
+            if (doAction(record))
+                break;
+        case VK_ESCAPE:
             isFocused = false;
             doAction(false);
-        } else {
+            break;
+        default:
             doAction(record);
         }
     } else {

@@ -126,7 +126,7 @@ namespace Hilltop {
             } event_args_t;
 
             std::vector<mapping_t> mapping;
-            std::vector<std::function<void(event_args_t)>> actions;
+            std::vector<std::function<bool(event_args_t)>> actions;
             std::vector<std::shared_ptr<Element>> elements;
             std::function<void(int, int)> observer;
 
@@ -136,8 +136,8 @@ namespace Hilltop {
 
             Form(int numElements);
 
-            void doAction(KEY_EVENT_RECORD record);
-            void doAction(bool focused);
+            bool doAction(KEY_EVENT_RECORD record);
+            bool doAction(bool focused);
             void doDirectionSwitch(KEY_EVENT_RECORD record, Direction direction);
             void switchCurrent(int destination);
             void handleKeyEvent(KEY_EVENT_RECORD record);

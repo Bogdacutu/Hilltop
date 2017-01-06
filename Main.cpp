@@ -8,6 +8,9 @@
 #include <sstream>
 #include <Windows.h>
 
+#undef min
+#undef max
+
 #define GAME_TICKS_PER_SEC 20
 #define GAME_TICK_MS (1000 / GAME_TICKS_PER_SEC)
 
@@ -37,6 +40,15 @@ std::shared_ptr<ElementCollection> moveArea;
 std::shared_ptr<Button> fireButton;
 std::shared_ptr<ElementCollection> powerArea;
 std::shared_ptr<ElementCollection> angleArea;
+
+std::shared_ptr<ProgressBar> angleProgressTop;
+std::shared_ptr<ProgressBar> angleProgressBottom;
+std::shared_ptr<TextBox> angleText;
+
+std::shared_ptr<ProgressBar> powerBar;
+std::shared_ptr<TextBox> powerText;
+
+std::shared_ptr<TankMatch> match;
 
 enum {
     WEAPON_AREA,
@@ -186,7 +198,7 @@ static void buildGameUI(ElementCollection *bottomArea) {
     powerArea->drawBackground = true;
     rightArea->addChild(*powerArea);
 
-    std::shared_ptr<ProgressBar> powerBar = ProgressBar::create();
+    powerBar = ProgressBar::create();
     powerBar->width = powerArea->width;
     powerBar->height = 3;
     powerBar->x = 0;
@@ -204,13 +216,12 @@ static void buildGameUI(ElementCollection *bottomArea) {
     powerBgText->text = std::string("  <") + std::string(powerArea->width - 6, ' ') + std::string(">  ");
     powerArea->addChild(*powerBgText);
 
-    std::shared_ptr<TextBox> powerText = TextBox::create();
+    powerText = TextBox::create();
     powerText->width = powerArea->width;
     powerText->height = 1;
     powerText->x = 1;
     powerText->y = 0;
     powerText->color = BLACK;
-    powerText->text = "Power: 50%";
     powerText->alignment = CENTER;
     powerArea->addChild(*powerText);
 
@@ -223,7 +234,7 @@ static void buildGameUI(ElementCollection *bottomArea) {
     angleArea->drawBackground = true;
     rightArea->addChild(*angleArea);
 
-    std::shared_ptr<ProgressBar> angleProgressTop = ProgressBar::create();
+    angleProgressTop = ProgressBar::create();
     angleProgressTop->width = angleArea->width;
     angleProgressTop->height = 1;
     angleProgressTop->x = 0;
@@ -233,7 +244,7 @@ static void buildGameUI(ElementCollection *bottomArea) {
     angleProgressTop->value = 0.5f;
     angleArea->addChild(*angleProgressTop);
 
-    std::shared_ptr<ProgressBar> angleProgressBottom = ProgressBar::create();
+    angleProgressBottom = ProgressBar::create();
     angleProgressBottom->width = angleArea->width;
     angleProgressBottom->height = 1;
     angleProgressBottom->x = 2;
@@ -249,37 +260,100 @@ static void buildGameUI(ElementCollection *bottomArea) {
     angleBgText->y = 0;
     angleBgText->backgroundColor = GRAY;
     angleBgText->color = DARK_GRAY;
-    angleBgText->text = std::string("  <") + std::string(angleArea->width - 6, ' ') + std::string(">   ");
+    angleBgText->text = std::string("  <") + std::string(angleArea->width - 6, ' ') + std::string(">  ");
     angleArea->addChild(*angleBgText);
 
-    std::shared_ptr<TextBox> angleText = TextBox::create();
+    angleText = TextBox::create();
     angleText->width = angleArea->width;
     angleText->height = 1;
     angleText->x = 1;
     angleText->y = 0;
     angleText->color = BLACK;
-    angleText->text = "Angle: 90";
     angleText->alignment = CENTER;
     angleArea->addChild(*angleText);
 }
 
-static void gameLoop() {
-    TankMatch match(GAME_WIDTH - 4, GAME_HEIGHT * 2 - 4);
-    match.buildMap([](float x) { return (std::sinf(x * 2 - 1.4f) + 1) / 2 + 0.1f; });
+static bool angleAreaAction(Form::event_args_t e) {
+    static const int deltaPerTick = 1;
 
-    for (int i = 0; i < GAME_WIDTH - 4; i += 10) {
-        std::shared_ptr<Tank> tank = Tank::create(BLUE);
-        tank->position = { 0, (float)i };
-        tank->angle = (i * 2) % 360;
-        tank->initWheels(&match);
-        match.addEntity(*tank);
+    int delta = 0;
+    
+    switch (e.record.wVirtualKeyCode) {
+    case VK_LEFT:
+        delta = deltaPerTick;
+        break;
+    case VK_RIGHT:
+        delta = -deltaPerTick;
+        break;
     }
+
+    int angle = match->players[match->currentPlayer]->tank->angle;
+    angle = (angle + delta) % 360;
+    if (angle < 0)
+        angle += 360;
+    match->players[match->currentPlayer]->tank->angle = angle;
+
+    return delta != 0;
+}
+
+static void angleAreaUpdate() {
+    int angle = match->players[match->currentPlayer]->tank->angle;
+    std::ostringstream text;
+    text << "Angle: " << angle;
+    angleText->text = text.str();
+    angleProgressTop->value = (float)std::min(180, angle) / 180.0f;
+    angleProgressBottom->value = (float)std::max(0, angle - 180) / 179.0f;
+}
+
+static bool powerAreaAction(Form::event_args_t e) {
+    static const int deltaPerTick = 1;
+
+    int delta = 0;
+
+    switch (e.record.wVirtualKeyCode) {
+    case VK_LEFT:
+        delta = -deltaPerTick;
+        break;
+    case VK_RIGHT:
+        delta = deltaPerTick;
+        break;
+    }
+
+    int power = match->players[match->currentPlayer]->tank->power;
+    power = std::min(100, std::max(0, power + delta));
+    match->players[match->currentPlayer]->tank->power = power;
+
+    return delta != 0;
+}
+
+static void powerAreaUpdate() {
+    int power = match->players[match->currentPlayer]->tank->power;
+    std::ostringstream text;
+    text << "Power: " << power << "%";
+    powerText->text = text.str();
+    powerBar->value = (float)power / 100.0f;
+}
+
+static void gameLoop() {
+    match = std::make_shared<TankMatch>(GAME_WIDTH - 4, GAME_HEIGHT * 2 - 4);
+    match->buildMap([](float x) { return (std::sinf(x * 2 - 1.4f) + 1) / 2 + 0.1f; });
+
+    for (int i = 0; i < 2; i++) {
+        std::shared_ptr<Tank> tank = Tank::create(i == 0 ? BLUE : RED);
+        match->addEntity(*tank);
+
+        std::shared_ptr<TankController> controller = TankController::create();
+        controller->tank = tank;
+        controller->isHuman = true;
+        controller->team = i + 1;
+        match->players.push_back(controller);
+    }
+    match->arrangeTanks();
 
     std::shared_ptr<BufferedConsoleRegion> mainRegion = BufferedConsoleRegion::create(*console,
         GAME_WIDTH - 2, GAME_HEIGHT - 1, 1, 2);
 
     ULONGLONG lastTime = GetTickCount64();
-    uint64_t tickNumber = 0;
 
     std::shared_ptr<TextBox> tickCounter = TextBox::create();
     tickCounter->x = tickCounter->y = 0;
@@ -318,6 +392,13 @@ static void gameLoop() {
     gameForm.mapping[ANGLE_AREA].left = FIRE_BUTTON_TOP;
     gameForm.mapping[POWER_AREA].top = ANGLE_AREA;
     gameForm.mapping[POWER_AREA].left = FIRE_BUTTON_BOTTOM;
+    gameForm.actions[ANGLE_AREA] = angleAreaAction;
+    gameForm.actions[POWER_AREA] = powerAreaAction;
+
+    // settle tanks
+    do {
+        match->doTick();
+    } while (match->recentUpdatesMattered());
     
     while (true) {
         ULONGLONG nowTime = GetTickCount64();
@@ -330,20 +411,28 @@ static void gameLoop() {
 
         console->clear(WHITE);
 
-        match.draw(*mainRegion);
+        match->draw(*mainRegion);
 
         while (ticks--) {
-            match.doTick(++tickNumber);
+            match->doTick();
             gameForm.tick();
         }
 
         std::ostringstream tickCounterText;
-        tickCounterText << "Tick " << tickNumber;
+        tickCounterText << "Tick " << match->tickNumber;
         tickCounter->text = tickCounterText.str();
         tickCounter->draw(*console);
 
+        angleAreaUpdate();
+        powerAreaUpdate();
+
         bottomArea->draw(*console);
-        gameForm.draw(*console, *bottomArea);
+
+        if (match->recentUpdatesMattered()) {
+            console->set(0, 0, L' ', make_bg_color(RED));
+        } else {
+            gameForm.draw(*console, *bottomArea);
+        }
 
         console->commit();
     }

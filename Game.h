@@ -184,16 +184,32 @@ namespace Hilltop {
             int angle = 45;
             int power = 50;
 
+            Vector2 getBarrelBase();
             Vector2 getBarrelEnd();
 
             static Vector2 calcTrajectory(int angle, int power);
 
             static std::shared_ptr<Tank> create(ConsoleColor color);
             static std::shared_ptr<Tank> create(ConsoleColor color, ConsoleColor barrelColor);
-            void initWheels(TankMatch *match);
+            void initWheels(TankMatch &match);
 
             virtual void onTick(TankMatch *match) override;
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
+        };
+
+
+        
+        class TankController : public std::enable_shared_from_this<TankController> {
+        protected:
+            TankController();
+
+        public:
+            std::shared_ptr<Tank> tank;
+            int team = 1;
+            bool isHuman = true;
+            int aiDifficulty;
+
+            static std::shared_ptr<TankController> create();
         };
 
 
@@ -213,17 +229,25 @@ namespace Hilltop {
             std::vector<std::shared_ptr<Entity>> entities;
             std::queue<std::pair<bool, std::shared_ptr<Entity>>> entityChanges;
 
-            const int timeBetweenRocket = 3;
+            static const int timeBetweenRocket = 100;
             int timeSinceLast = 0;
 
-            void doEntityTick();
+            static const int recentUpdateCount = 10;
+            bool recentUpdateResult[10] = {};
+
+            bool doEntityTick();
             bool doLandPhysics();
 
         public:
             const unsigned short width, height;
             Console::DoublePixelBufferedConsole canvas;
 
+            std::vector<std::shared_ptr<TankController>> players;
+            int currentPlayer = 0;
+
             Vector2 gravity = { 0.15f, 0.0f };
+            bool updateMattered = false;
+            uint64_t tickNumber = 0;
 
             TankMatch(unsigned short width, unsigned short height);
 
@@ -234,11 +258,16 @@ namespace Hilltop {
             void removeEntity(Entity &entity);
 
             void buildMap(std::function<float(float)> generator);
+            void arrangeTanks();
             std::pair<bool, Vector2> checkForHit(const Vector2 from, const Vector2 to, bool groundHog = false);
             
             void draw(Console::Console &console);
 
-            void doTick(uint64_t tickNumber);
+            void doTick();
+            bool recentUpdatesMattered();
+            void fire();
+
+            int getNextPlayer();
         };
     }
 }

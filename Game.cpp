@@ -272,13 +272,17 @@ Hilltop::Game::Tank::Tank(ConsoleColor color, ConsoleColor barrelColor)
     gravityMult = 0.0f;
 }
 
+Vector2 Hilltop::Game::Tank::getBarrelBase() {
+    return position.round() + Vector2(-2.0f, 2.0f);
+}
+
 Vector2 Hilltop::Game::Tank::getBarrelEnd() {
     static const float ds2 = std::sqrtf(2.0) * 2.0f;
 
     float a = angle * PI / 180.0f;
-    Vector2 p = position.round();
+    Vector2 p = getBarrelBase();
 
-    Vector2 c = { std::sinf(a), std::cosf(a) };
+    Vector2 c = { -std::sinf(a), std::cosf(a) };
     Vector2 c2 = { c.X * c.X, c.Y * c.Y };
     Vector2 subterm = { 2.0f + c2.X - c2.Y, 2.0f - c2.X + c2.Y };
     Vector2 term1 = { subterm.X + c.X * ds2, subterm.Y + c.Y * ds2 };
@@ -303,13 +307,13 @@ std::shared_ptr<Tank> Hilltop::Game::Tank::create(ConsoleColor color, ConsoleCol
     return std::shared_ptr<Tank>(new Tank(color, barrelColor));
 }
 
-void Hilltop::Game::Tank::initWheels(TankMatch *match) {
+void Hilltop::Game::Tank::initWheels(TankMatch &match) {
     for (int i = 0; i < 5; i++) {
         if (!wheels[i]) {
             wheels[i] = TankWheel::create();
             wheels[i]->position = { position.X, position.Y + i };
         }
-        match->addEntity(*wheels[i]);
+        match.addEntity(*wheels[i]);
     }
 }
 
@@ -340,8 +344,8 @@ void Hilltop::Game::Tank::onDraw(TankMatch *match, Console::DoublePixelBufferedC
     
     // draw barrel
     float a = angle * pi / 180.0f;
-    foreachPixel(p, getBarrelEnd(), [this, &console](Vector2 v)->bool {
-        console.set(v.X - 2, v.Y + 2, barrelColor);
+    foreachPixel(getBarrelBase(), getBarrelEnd(), [this, &console](Vector2 v)->bool {
+        console.set(v.X, v.Y, barrelColor);
         return false;
     });
 
@@ -355,12 +359,26 @@ void Hilltop::Game::Tank::onDraw(TankMatch *match, Console::DoublePixelBufferedC
 
 
 //
+// TankController
+//
+
+Hilltop::Game::TankController::TankController() {}
+
+std::shared_ptr<TankController> Hilltop::Game::TankController::create() {
+    return std::shared_ptr<TankController>(new TankController());
+}
+
+
+
+//
 // TankMatch
 //
 
 static const ConsoleColor LAND_COLORS[NUM_LAND_TYPES] = { DARK_BLUE, DARK_GREEN, BROWN, BLACK };
 
-void Hilltop::Game::TankMatch::doEntityTick() {
+bool Hilltop::Game::TankMatch::doEntityTick() {
+    bool ret = false;
+
     for (const std::shared_ptr<Entity> &p : entities) {
         p->onTick(this);
     }
@@ -374,11 +392,15 @@ void Hilltop::Game::TankMatch::doEntityTick() {
         bool exists = it != entities.end();
 
         if (ev.first) {
-            if (!exists)
+            if (!exists) {
                 entities.push_back(ev.second);
+                ret = true;
+            }
         } else {
-            if (exists)
+            if (exists) {
                 entities.erase(it);
+                ret = true;
+            }
         }
     }
 
@@ -390,11 +412,16 @@ void Hilltop::Game::TankMatch::doEntityTick() {
         if (hit.first)
             p->onHit(this);
 
+        if (oldPos.round() != p->position.round())
+            ret = true;
+
         p->direction = p->direction + gravity * p->gravityMult;
 
         if (p->position.Y < 0 || p->position.Y >= width || p->position.X > height + 1)
             removeEntity(*p);
     }
+
+    return ret;
 }
 
 bool Hilltop::Game::TankMatch::doLandPhysics() {
@@ -450,6 +477,21 @@ void Hilltop::Game::TankMatch::buildMap(std::function<float(float)> generator) {
     }
 }
 
+void Hilltop::Game::TankMatch::arrangeTanks() {
+    int leftBound = 10;
+    int rightBound = width - 1 - 10 - 4;
+    for (int i = 0; i < players.size(); i++) {
+        int left = scale(i, 0, players.size() - 1, leftBound, rightBound);
+        players[i]->tank->position = Vector2(-1, left);
+        players[i]->tank->initWheels(*this);
+
+        if (left > width / 2)
+            players[i]->tank->angle = 135;
+        else
+            players[i]->tank->angle = 45;
+    }
+}
+
 std::pair<bool, Vector2> Hilltop::Game::TankMatch::checkForHit(const Vector2 from, const Vector2 to,
     bool groundHog) {
     std::pair<bool, Vector2> ret = std::make_pair(false, to);
@@ -482,7 +524,10 @@ void Hilltop::Game::TankMatch::draw(Console::Console &console) {
     canvas.commit(console);
 }
 
-void Hilltop::Game::TankMatch::doTick(uint64_t tickNumber) {
+void Hilltop::Game::TankMatch::doTick() {
+    tickNumber++;
+    updateMattered = false;
+
     if (timeSinceLast == timeBetweenRocket) {
         timeSinceLast = 0;
 
@@ -501,7 +546,36 @@ void Hilltop::Game::TankMatch::doTick(uint64_t tickNumber) {
     timeSinceLast++;
 
     if (tickNumber % 3 == 0)
-        doLandPhysics();
+        updateMattered |= doLandPhysics();
     
-    doEntityTick();
+    updateMattered |= doEntityTick();
+
+    recentUpdateResult[tickNumber % recentUpdateCount] = updateMattered;
+}
+
+bool Hilltop::Game::TankMatch::recentUpdatesMattered() {
+    for (int i = 0; i < recentUpdateCount; i++)
+        if (recentUpdateResult[i])
+            return true;
+    return false;
+}
+
+int Hilltop::Game::TankMatch::getNextPlayer() {
+    int currentTeam = players[currentPlayer]->team;
+    
+    for (int i = currentPlayer + 1; i < players.size(); i++)
+        if (players[i]->team == currentTeam)
+            return i;
+
+    currentTeam++;
+
+    for (int i = 0; i < players.size(); i++)
+        if (players[i]->team == currentTeam)
+            return i;
+
+    for (int i = 0; i < players.size(); i++)
+        if (players[i]->team == 1)
+            return i;
+
+    return 0; // fallback
 }
