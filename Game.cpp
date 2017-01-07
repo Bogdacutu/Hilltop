@@ -366,8 +366,8 @@ void Hilltop::Game::Tank::initWheels(TankMatch &match) {
     for (int i = 0; i < 5; i++) {
         if (!wheels[i]) {
             wheels[i] = TankWheel::create();
-            wheels[i]->position = { position.X, position.Y + i };
         }
+        wheels[i]->position = { position.X, position.Y + i };
         match.addEntity(*wheels[i]);
     }
 }
@@ -415,6 +415,51 @@ void Hilltop::Game::Tank::drawReticle(TankMatch *match, Console::DoublePixelBuff
     float ang = (float)angle * PI / 180.0f;
     Vector2 p = (getBarrelBase().round() + Vector2(-std::sinf(ang), std::cosf(ang)) * 10.0f).round();
     console.set(p.X, p.Y, WHITE);
+}
+
+bool Hilltop::Game::Tank::canMove(TankMatch *match, int direction) {
+    Vector2 p = position;
+    doMove(match, direction);
+    if (p != position) {
+        position = p;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+void Hilltop::Game::Tank::doMove(TankMatch *match, int direction) {
+    Vector2 p = position.round() + Vector2(0, direction);
+    if (p.X < 0.0f || p.X >= match->width - 5.0f)
+        return;
+
+    bool ret = true;
+    for (int i = 1; i <= 2; i++) {
+        for (int j = 0; j < 5; j++) {
+            if (match->get(p.X - i, p.Y + j) != AIR) {
+                ret = false;
+                break;
+            }
+        }
+    }
+    if (ret) {
+        position = p;
+    } else {
+        ret = true;
+        for (int i = 1; i <= 2; i++) {
+            for (int j = 0; j < 5; j++) {
+                if (match->get(p.X - i - 1, p.Y + j) != AIR) {
+                    ret = false;
+                    break;
+                }
+            }
+        }
+        if (ret)
+            position = p + Vector2(-1.0f, 0.0f);
+    }
+
+    if (ret)
+        initWheels(*match);
 }
 
 

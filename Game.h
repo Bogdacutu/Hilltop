@@ -216,6 +216,9 @@ namespace Hilltop {
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
 
             void drawReticle(TankMatch *match, Console::DoublePixelBufferedConsole &console);
+
+            bool canMove(TankMatch *match, int direction);
+            void doMove(TankMatch *match, int direction);
         };
 
 
@@ -260,12 +263,14 @@ namespace Hilltop {
             TankController();
 
         public:
+            static const int MOVES_PER_TURN = 25;
+
             std::shared_ptr<Tank> tank;
             int team = 1;
             bool isHuman = true;
             std::vector<std::pair<std::shared_ptr<Weapon>, int>> weapons;
             int currentWeapon = 0;
-            int movesLeft = 0;
+            int movesLeft = MOVES_PER_TURN;
 
             int aiDifficulty = 0;
             Vector2 lastHit;

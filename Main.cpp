@@ -357,7 +357,30 @@ static void weaponAreaUpdate() {
 }
 
 static bool moveAreaAction(Form::event_args_t e) {
-    return false;
+    int delta = 0;
+
+    switch (e.record.wVirtualKeyCode) {
+    case VK_LEFT:
+    case VK_UP:
+        delta = -1;
+        break;
+    case VK_RIGHT:
+    case VK_DOWN:
+        delta = 1;
+        break;
+    case VK_RETURN:
+    case VK_SPACE:
+        e.form.isFocused = false;
+        return true;
+    }
+
+    std::shared_ptr<TankController> player = match->players[match->currentPlayer];
+    if (delta != 0 && player->movesLeft) {
+        player->movesLeft--;
+        player->tank->doMove(match.get(), delta);
+    }
+
+    return delta != 0;
 }
 
 static void moveAreaUpdate() {
@@ -582,6 +605,7 @@ static void gameLoop() {
             }
 
             match->currentPlayer = match->getNextPlayer();
+            match->players[match->currentPlayer]->movesLeft = TankController::MOVES_PER_TURN;
             if (match->players[match->currentPlayer]->isHuman) {
                 match->isAiming = true;
             } else {
