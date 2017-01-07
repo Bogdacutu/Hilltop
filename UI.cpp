@@ -139,8 +139,8 @@ std::shared_ptr<ProgressBar> Hilltop::UI::ProgressBar::create() {
 // Form
 //
 
-static bool findBounds(std::shared_ptr<const Element> needle, std::shared_ptr<const Element> haystack,
-    unsigned short *x, unsigned short *y) {
+bool Hilltop::UI::Form::findBounds(std::shared_ptr<const Element> needle,
+    std::shared_ptr<const Element> haystack, unsigned short *x, unsigned short *y) {
     if (needle == haystack) {
         *x = needle->x;
         *y = needle->y;
@@ -194,7 +194,7 @@ Hilltop::UI::Form::Form(int numElements)
     : mapping(numElements), actions(numElements), elements(numElements) {}
 
 bool Hilltop::UI::Form::doAction(KEY_EVENT_RECORD record) {
-    event_args_t args{ *this };
+    event_args_t args(*this);
 
     args.type = KEY;
     args.position = currentPos;
@@ -207,7 +207,7 @@ bool Hilltop::UI::Form::doAction(KEY_EVENT_RECORD record) {
 }
 
 bool Hilltop::UI::Form::doAction(bool focused) {
-    event_args_t args{ *this };
+    event_args_t args(*this);
 
     args.type = focused ? FOCUS : BLUR;
 

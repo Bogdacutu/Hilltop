@@ -93,6 +93,9 @@ namespace Hilltop {
 
         class Form {
         public:
+            static bool findBounds(std::shared_ptr<const Element> needle,
+                std::shared_ptr<const Element> haystack, unsigned short *x, unsigned short *y);
+
             enum Direction {
                 NONE = 0,
                 UP,
@@ -112,19 +115,21 @@ namespace Hilltop {
 
             static const int BLINK_TICKS = 7;
 
-            typedef struct {
+            struct mapping_t {
                 int top = NO_ACTION;
                 int bottom = NO_ACTION;
                 int left = NO_ACTION;
                 int right = NO_ACTION;
-            } mapping_t;
+            };
 
-            typedef struct {
+            struct event_args_t {
                 Form &form;
-                EventType type;
                 int position;
-                KEY_EVENT_RECORD record;
-            } event_args_t;
+                EventType type;
+                KEY_EVENT_RECORD record = {};
+
+                event_args_t(Form &form) : form(form) {}
+            };
 
             std::vector<mapping_t> mapping;
             std::vector<std::function<bool(event_args_t)>> actions;

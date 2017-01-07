@@ -239,6 +239,41 @@ void Hilltop::Game::Explosion::onDraw(TankMatch *match, Console::DoublePixelBuff
 
 
 //
+// Tracer
+//
+
+Hilltop::Game::Tracer::Tracer() {}
+
+std::shared_ptr<Tracer> Hilltop::Game::Tracer::create() {
+    return std::shared_ptr<Tracer>(new Tracer());
+}
+
+void Hilltop::Game::Tracer::onTick(TankMatch *match) {
+    Entity::onTick(match);
+
+    match->updateMattered = true;
+}
+
+void Hilltop::Game::Tracer::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
+    Entity::onDraw(match, console);
+
+    if (hasHit) {
+        // TODO
+    }
+}
+
+void Hilltop::Game::Tracer::onHit(TankMatch *match) {
+    if (!hasHit) {
+        maxEntityAge = entityAge + tracerDuration;
+        gravityMult = 0.0f;
+    }
+
+    Entity::onHit(match);
+}
+
+
+
+//
 // TankWheel
 //
 
@@ -293,10 +328,30 @@ Vector2 Hilltop::Game::Tank::getBarrelEnd() {
     return p + r * 2.0f;
 }
 
+Vector2 Hilltop::Game::Tank::getProjectileBase() {
+    Vector2 r = getBarrelEnd().round();
+    Vector2 p = (r - getBarrelBase()).round();
+
+    if (p.X >= 1.0f)
+        r.X += 1.0f;
+    else if (p.X <= -1.0f)
+        r.X -= 1.0f;
+
+    if (p.Y >= 1.0f)
+        r.Y += 1.0f;
+    else if (p.Y <= -1.0f)
+        r.Y -= 1.0f;
+
+    return r;
+}
+
 Vector2 Hilltop::Game::Tank::calcTrajectory(int angle, int power) {
-    const static float pi = std::atanf(1) * 4;
-    float ang = (float)angle * pi / 180;
+    float ang = (float)angle * PI / 180.0f;
     return Vector2(-std::sinf(ang), std::cosf(ang)) * 8.0f * ((float)power / 100.0f);
+}
+
+Vector2 Hilltop::Game::Tank::calcTrajectory() {
+    return Tank::calcTrajectory(angle, power);
 }
 
 std::shared_ptr<Tank> Hilltop::Game::Tank::create(ConsoleColor color) {
@@ -356,6 +411,68 @@ void Hilltop::Game::Tank::onDraw(TankMatch *match, Console::DoublePixelBufferedC
         console.set(p.X - 2, p.Y + i, color);
 }
 
+void Hilltop::Game::Tank::drawReticle(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
+    float ang = (float)angle * PI / 180.0f;
+    Vector2 p = (getBarrelBase().round() + Vector2(-std::sinf(ang), std::cosf(ang)) * 10.0f).round();
+    console.set(p.X, p.Y, WHITE);
+}
+
+
+
+//
+// Weapon
+//
+
+const std::string Hilltop::Game::Weapon::INVALID_NAME = "<invalid name>";
+
+void Hilltop::Game::Weapon::fire(TankMatch &match) {
+    std::shared_ptr<TankController> player = match.players[match.currentPlayer];
+    std::shared_ptr<LastHitTracer> tracer = LastHitTracer::create(*player);
+    tracer->position = player->tank->getProjectileBase();
+    tracer->direction = player->tank->calcTrajectory();
+    match.addEntity(*tracer);
+}
+
+
+
+//
+// RocketWeapon
+//
+
+std::shared_ptr<SimpleRocket> Hilltop::Game::RocketWeapon::createRocket(Vector2 position,
+    Vector2 direction) {
+    std::shared_ptr<SimpleRocket> rocket = SimpleTrailedRocket::create(WHITE, DARK_GRAY, 3);
+    rocket->position = position;
+    rocket->direction = direction;
+    return rocket;
+}
+
+Hilltop::Game::RocketWeapon::RocketWeapon(int numRockets) : Weapon(), numRockets(numRockets) {}
+
+void Hilltop::Game::RocketWeapon::fire(TankMatch &match) {
+    Weapon::fire(match);
+
+    std::shared_ptr<Tank> tank = match.players[match.currentPlayer]->tank;
+    std::shared_ptr<Entity> rocket = createRocket(tank->getProjectileBase(), tank->calcTrajectory());
+    match.addEntity(*rocket);
+}
+
+
+
+//
+// DirtRocketWeapon
+//
+
+std::shared_ptr<SimpleRocket> Hilltop::Game::DirtRocketWeapon::createRocket(Vector2 position,
+    Vector2 direction) {
+    std::shared_ptr<SimpleRocket> rocket = RocketWeapon::createRocket(position, direction);
+    rocket->destroyLand = false;
+    rocket->createLand = true;
+    return rocket;
+}
+
+Hilltop::Game::DirtRocketWeapon::DirtRocketWeapon(int numRockets) : RocketWeapon(numRockets) {}
+
 
 
 //
@@ -366,6 +483,39 @@ Hilltop::Game::TankController::TankController() {}
 
 std::shared_ptr<TankController> Hilltop::Game::TankController::create() {
     return std::shared_ptr<TankController>(new TankController());
+}
+
+void Hilltop::Game::TankController::applyAI(TankController &player) {}
+
+
+
+//
+// LastHitTracer
+//
+
+Hilltop::Game::LastHitTracer::LastHitTracer(TankController &player) : player(player.shared_from_this()) {}
+
+std::shared_ptr<LastHitTracer> Hilltop::Game::LastHitTracer::create(TankController &player) {
+    return std::shared_ptr<LastHitTracer>(new LastHitTracer(player));
+}
+
+void Hilltop::Game::LastHitTracer::onTick(TankMatch *match) {
+    Entity::onTick(match);
+}
+
+void Hilltop::Game::LastHitTracer::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
+    Entity::onDraw(match, console);
+
+    Vector2 p = position.round();
+    if (!player->isHuman)
+        console.set(p.X, p.Y, RED);
+}
+
+void Hilltop::Game::LastHitTracer::onHit(TankMatch *match) {
+    Tracer::onHit(match);
+
+    player->lastHit = position.round();
+    player->hasLastHit = true;
 }
 
 
@@ -405,6 +555,9 @@ bool Hilltop::Game::TankMatch::doEntityTick() {
     }
 
     for (const std::shared_ptr<Entity> &p : entities) {
+        if (p->entityAge <= 0)
+            continue;
+
         Vector2 oldPos = p->position;
         Vector2 newPos = oldPos + p->direction;
         std::pair<bool, Vector2> hit = checkForHit(oldPos, newPos, p->groundHog);
@@ -417,7 +570,8 @@ bool Hilltop::Game::TankMatch::doEntityTick() {
 
         p->direction = p->direction + gravity * p->gravityMult;
 
-        if (p->position.Y < 0 || p->position.Y >= width || p->position.X > height + 1)
+        Vector2 pos = p->position.round();
+        if (pos.Y < 0 || pos.Y >= width || pos.X > height + 1)
             removeEntity(*p);
     }
 
@@ -438,6 +592,26 @@ bool Hilltop::Game::TankMatch::doLandPhysics() {
         }
     }
     return ret;
+}
+
+std::vector<std::shared_ptr<Weapon>> Hilltop::Game::TankMatch::weapons;
+
+void Hilltop::Game::TankMatch::initalizeWeapons() {
+    {
+        std::shared_ptr<RocketWeapon> weapon = std::make_shared<RocketWeapon>(1);
+        weapon->name = "Ordinary Missile";
+        weapons.push_back(weapon);
+    }
+
+    {
+        std::shared_ptr<DirtRocketWeapon> weapon = std::make_shared<DirtRocketWeapon>(1);
+        weapon->name = "Dirty Missile";
+        weapons.push_back(weapon);
+    }
+
+    for (const std::shared_ptr<Weapon> &weapon : weapons)
+        if (weapon->name == Weapon::INVALID_NAME)
+            __debugbreak();
 }
 
 LandType Hilltop::Game::TankMatch::get(int x, int y) {
@@ -521,6 +695,11 @@ void Hilltop::Game::TankMatch::draw(Console::Console &console) {
         p->onDraw(this, canvas);
     }
 
+    if (isAiming) {
+        if (tickNumber % (aimReticleTime * 2) < aimReticleTime)
+            players[currentPlayer]->tank->drawReticle(this, canvas);
+    }
+
     canvas.commit(console);
 }
 
@@ -544,11 +723,11 @@ bool Hilltop::Game::TankMatch::recentUpdatesMattered() {
 }
 
 void Hilltop::Game::TankMatch::fire() {
-    std::shared_ptr<SimpleRocket> rocket = SimpleTrailedRocket::create(WHITE, DARK_GRAY, 3);
-    rocket->position = players[currentPlayer]->tank->getBarrelEnd();
-    rocket->direction = Tank::calcTrajectory(players[currentPlayer]->tank->angle,
-        players[currentPlayer]->tank->power);
-    addEntity(*rocket);
+    std::shared_ptr<TankController> player = players[currentPlayer];
+    std::pair<std::shared_ptr<Weapon>, int> &weapon = player->weapons[player->currentWeapon];
+    weapon.first->fire(*this);
+    if (weapon.second < 99)
+        weapon.second--;
 }
 
 int Hilltop::Game::TankMatch::getNextPlayer() {

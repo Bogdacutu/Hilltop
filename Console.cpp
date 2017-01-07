@@ -200,9 +200,9 @@ TextBoxSize Hilltop::Console::printText(BufferedConsole *buffer, unsigned short 
         for (int i = 0; i < lines.size(); i++) {
             int offset = 0;
             if (align == CENTER)
-                offset = (width - lines[i].length()) / 2;
+                offset = (int)(width - lines[i].length()) / 2;
             else if (align == RIGHT)
-                offset = width - lines[i].length();
+                offset = (int)(width - lines[i].length());
 
             for (int j = 0; j < lines[i].length(); j++)
                 region->set(i, offset + j, lines[i][j], color, FOREGROUND_COLOR);

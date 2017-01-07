@@ -59,7 +59,7 @@ namespace Hilltop {
         float distance(const Vector2 from, const Vector2 to);
 
         void foreachPixel(const Vector2 from, const Vector2 to, std::function<bool(Vector2)> handler);
-        
+
 
 
         class TankMatch;
@@ -106,7 +106,7 @@ namespace Hilltop {
             virtual void onHit(TankMatch *match) override;
         };
 
-        
+
         class SimpleTrailedRocket final : public SimpleRocket {
         protected:
             SimpleTrailedRocket(ConsoleColor color, ConsoleColor trailColor, int trailTime);
@@ -158,6 +158,23 @@ namespace Hilltop {
         };
 
 
+        class Tracer : public Entity {
+        protected:
+            Tracer();
+
+        public:
+            static const int tracerDuration = 30;
+
+            std::string text;
+
+            static std::shared_ptr<Tracer> create();
+
+            virtual void onTick(TankMatch *match) override;
+            virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
+            virtual void onHit(TankMatch *match) override;
+        };
+
+
         class TankWheel final : public Entity {
         protected:
             TankWheel();
@@ -186,8 +203,10 @@ namespace Hilltop {
 
             Vector2 getBarrelBase();
             Vector2 getBarrelEnd();
+            Vector2 getProjectileBase();
 
             static Vector2 calcTrajectory(int angle, int power);
+            Vector2 calcTrajectory();
 
             static std::shared_ptr<Tank> create(ConsoleColor color);
             static std::shared_ptr<Tank> create(ConsoleColor color, ConsoleColor barrelColor);
@@ -195,10 +214,47 @@ namespace Hilltop {
 
             virtual void onTick(TankMatch *match) override;
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
+
+            void drawReticle(TankMatch *match, Console::DoublePixelBufferedConsole &console);
         };
 
 
-        
+
+        class Weapon {
+        public:
+            static const std::string INVALID_NAME;
+
+            std::string name = INVALID_NAME;
+
+            Console::BufferedConsole::pixel_t icon[2];
+
+            virtual void fire(TankMatch &match);
+        };
+
+
+        class RocketWeapon : public Weapon {
+        protected:
+            virtual std::shared_ptr<SimpleRocket> createRocket(Vector2 position, Vector2 direction);
+            
+        public:
+            RocketWeapon(int numRockets);
+
+            const int numRockets;
+
+            virtual void fire(TankMatch &match) override;
+        };
+
+
+        class DirtRocketWeapon final : public RocketWeapon {
+        protected:
+            virtual std::shared_ptr<SimpleRocket> createRocket(Vector2 position, Vector2 direction) override;
+
+        public:
+            DirtRocketWeapon(int numRockets);
+        };
+
+
+
         class TankController : public std::enable_shared_from_this<TankController> {
         protected:
             TankController();
@@ -207,9 +263,32 @@ namespace Hilltop {
             std::shared_ptr<Tank> tank;
             int team = 1;
             bool isHuman = true;
-            int aiDifficulty;
+            std::vector<std::pair<std::shared_ptr<Weapon>, int>> weapons;
+            int currentWeapon = 0;
+            int movesLeft = 0;
+
+            int aiDifficulty = 0;
+            Vector2 lastHit;
+            bool hasLastHit = false;
 
             static std::shared_ptr<TankController> create();
+
+            static void applyAI(TankController &player);
+        };
+
+
+        class LastHitTracer final : public Tracer {
+        protected:
+            LastHitTracer(TankController &player);
+
+        public:
+            const std::shared_ptr<TankController> player;
+
+            static std::shared_ptr<LastHitTracer> create(TankController &player);
+
+            virtual void onTick(TankMatch *match) override;
+            virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
+            virtual void onHit(TankMatch *match) override;
         };
 
 
@@ -232,6 +311,8 @@ namespace Hilltop {
             static const int recentUpdateCount = 10;
             bool recentUpdateResult[10] = {};
 
+            static const int aimReticleTime = 6;
+
             bool doEntityTick();
             bool doLandPhysics();
 
@@ -246,6 +327,9 @@ namespace Hilltop {
             bool updateMattered = false;
             uint64_t tickNumber = 0;
             bool isAiming = true;
+
+            static std::vector<std::shared_ptr<Weapon>> weapons;
+            static void initalizeWeapons();
 
             TankMatch(unsigned short width, unsigned short height);
 
