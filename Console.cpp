@@ -85,6 +85,11 @@ BufferedConsole::pixel_t Hilltop::Console::BufferedConsoleRegion::get(unsigned s
 }
 
 void Hilltop::Console::BufferedConsoleRegion::set(unsigned short x, unsigned short y, wchar_t ch,
+    ConsoleColor color) {
+    BufferedConsole::set(x, y, ch, color);
+}
+
+void Hilltop::Console::BufferedConsoleRegion::set(unsigned short x, unsigned short y, wchar_t ch,
     ConsoleColor color, ConsoleColorType colorMask) {
     if (enforceBounds)
         if (x >= height || y >= width)

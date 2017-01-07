@@ -163,7 +163,7 @@ namespace Hilltop {
             Tracer();
 
         public:
-            static const int tracerDuration = 30;
+            static const int DURATION = 30;
 
             std::string text;
 
@@ -293,7 +293,6 @@ namespace Hilltop {
 
             virtual void onTick(TankMatch *match) override;
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
-            virtual void onHit(TankMatch *match) override;
         };
 
 
@@ -313,15 +312,17 @@ namespace Hilltop {
             std::vector<std::shared_ptr<Entity>> entities;
             std::queue<std::pair<bool, std::shared_ptr<Entity>>> entityChanges;
 
-            static const int recentUpdateCount = 10;
+            static const int RECENT_UPDATE_COUNT = 10;
             bool recentUpdateResult[10] = {};
 
-            static const int aimReticleTime = 6;
+            static const int AIM_RETICLE_TIME = 6;
 
             bool doEntityTick();
             bool doLandPhysics();
 
         public:
+            static const int UNLIMITED_WEAPON_THRESHOLD = 99;
+
             const unsigned short width, height;
             Console::DoublePixelBufferedConsole canvas;
 

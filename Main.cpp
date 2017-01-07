@@ -32,9 +32,6 @@ std::shared_ptr<BufferedConsole> console;
 std::shared_ptr<ElementCollection> bottomArea;
 
 std::shared_ptr<ElementCollection> weaponArea;
-std::shared_ptr<Button> weaponIcon[2];
-std::shared_ptr<TextBox> weaponText;
-std::shared_ptr<TextBox> weaponNumber;
 
 std::shared_ptr<ElementCollection> moveArea;
 std::shared_ptr<TextBox> moveText;
@@ -109,32 +106,6 @@ static void buildGameUI(ElementCollection *bottomArea) {
     weaponRight->color = GRAY;
     weaponRight->text = ">";
     weaponArea->addChild(*weaponRight);
-
-    for (int i = 0; i < 2; i++) {
-        weaponIcon[i] = Button::create();
-        weaponIcon[i]->width = 1;
-        weaponIcon[i]->height = 1;
-        weaponIcon[i]->x = 1;
-        weaponIcon[i]->y = weaponLeft->width + 2 + i;
-        weaponArea->addChild(*weaponIcon[i]);
-    }
-
-    weaponText = TextBox::create();
-    weaponText->width = weaponArea->width - weaponRight->width - weaponLeft->width - 8;
-    weaponText->height = 1;
-    weaponText->x = 1;
-    weaponText->y = weaponLeft->width + 6;
-    weaponText->color = BLACK;
-    weaponArea->addChild(*weaponText);
-
-    weaponNumber = TextBox::create();
-    weaponNumber->width = weaponText->width;
-    weaponNumber->height = 1;
-    weaponNumber->x = 1;
-    weaponNumber->y = weaponText->y;
-    weaponNumber->color = DARK_GRAY;
-    weaponNumber->alignment = RIGHT;
-    weaponArea->addChild(*weaponNumber);
 
     moveArea = ElementCollection::create();
     moveArea->width = leftArea->width - 6;
@@ -304,10 +275,13 @@ static void drawWeaponEntry(BufferedConsole &console, Weapon &weapon, int num, b
     std::shared_ptr<BufferedConsole> sub = BufferedConsoleRegion::create(console,
         console.width - 10, 1, 0, 5);
 
-    std::ostringstream numText;
-    numText << num;
     ConsoleColor textC = active ? BLACK : GRAY;
     printText(sub.get(), 0, 6, sub->width - 8, 1, weapon.name, textC);
+
+    std::ostringstream numText;
+    numText << num;
+    if (num >= TankMatch::UNLIMITED_WEAPON_THRESHOLD)
+        numText << '+';
 
     ConsoleColor numC = active ? DARK_GRAY : GRAY;
     printText(sub.get(), 0, 6, sub->width - 8, 1, numText.str(), numC, RIGHT);
@@ -316,27 +290,46 @@ static void drawWeaponEntry(BufferedConsole &console, Weapon &weapon, int num, b
     sub->set(0, 3, weapon.icon[1].ch, weapon.icon[1].color);
 }
 
+static bool shadowPixel(BufferedConsole &console, unsigned short x, unsigned short y, ConsoleColor from,
+    ConsoleColor to) {
+    BufferedConsole::pixel_t pixel = console.get(x, y);
+    ConsoleColor c = (ConsoleColor)((pixel.color & BACKGROUND_COLOR) >> BACKGROUND_SHIFT);
+    if (c == from && pixel.ch == L' ') {
+        console.set(x, y, L' ', make_bg_color(to));
+        return true;
+    } else {
+        return false;
+    }
+}
+
 static void drawWeaponList() {
     std::shared_ptr<TankController> player = match->players[match->currentPlayer];
     int height = (int)player->weapons.size();
     unsigned short x = 0;
     unsigned short y = 0;
     Form::findBounds(weaponArea, bottomArea, &x, &y);
-    std::shared_ptr<BufferedConsole> region = BufferedConsoleRegion::create(*console,
+    std::shared_ptr<BufferedConsoleRegion> region = BufferedConsoleRegion::create(*console,
         weaponArea->width + 2, height + 2, x - height - 2, y - 1);
+    region->enforceBounds = false;
     region->clear(BLACK);
 
     for (int i = 0; i < region->height; i++) {
         region->set(i, 0, L' ', make_bg_color(WHITE));
         region->set(i, region->width - 1, L' ', make_bg_color(WHITE));
+
+        shadowPixel(*region, i, -1, WHITE, DARK_GRAY);
+        shadowPixel(*region, i, region->width, WHITE, DARK_GRAY);
+
+        shadowPixel(*region, i, -2, WHITE, GRAY);
+        shadowPixel(*region, i, region->width + 1, WHITE, GRAY);
     }
 
     for (int i = 1; i < region->width - 1; i++) {
-        region->BufferedConsole::set(0, i, L'▄', make_color(WHITE, DARK_GRAY));
+        region->set(0, i, L'▄', make_color(WHITE, DARK_GRAY));
     }
 
     for (int i = 0; i <= height; i++) {
-        std::shared_ptr<BufferedConsole> sub = BufferedConsoleRegion::create(*region,
+        std::shared_ptr<BufferedConsoleRegion> sub = BufferedConsoleRegion::create(*region,
             region->width - 2, 1, i + 1, 1);
         bool active = player->currentWeapon == i;
         ConsoleColor bg = active ? GRAY : DARK_GRAY;
@@ -348,12 +341,15 @@ static void drawWeaponList() {
     }
 }
 
-static void weaponAreaUpdate() {
+static void weaponAreaDraw() {
     std::shared_ptr<TankController> player = match->players[match->currentPlayer];
-    weaponText->text = player->weapons[player->currentWeapon].first->name;
-    std::ostringstream number;
-    number << player->weapons[player->currentWeapon].second;
-    weaponNumber->text = number.str();
+    unsigned short x = 0;
+    unsigned short y = 0;
+    Form::findBounds(weaponArea, bottomArea, &x, &y);
+    std::shared_ptr<BufferedConsole> region = BufferedConsoleRegion::create(*console,
+        weaponArea->width, 1, x + 1, y);
+    drawWeaponEntry(*region, *player->weapons[player->currentWeapon].first,
+        player->weapons[player->currentWeapon].second, true);
 }
 
 static bool moveAreaAction(Form::event_args_t e) {
@@ -390,16 +386,16 @@ static void moveAreaUpdate() {
 }
 
 static bool angleAreaAction(Form::event_args_t e) {
-    static const int deltaPerTick = 1;
+    static const int DELTA_PER_TICK = 1;
 
     int delta = 0;
     
     switch (e.record.wVirtualKeyCode) {
     case VK_LEFT:
-        delta = deltaPerTick;
+        delta = DELTA_PER_TICK;
         break;
     case VK_RIGHT:
-        delta = -deltaPerTick;
+        delta = -DELTA_PER_TICK;
         break;
     case VK_RETURN:
     case VK_SPACE:
@@ -430,16 +426,16 @@ static void angleAreaUpdate() {
 }
 
 static bool powerAreaAction(Form::event_args_t e) {
-    static const int deltaPerTick = 1;
+    static const int DELTA_PER_TICK = 1;
 
     int delta = 0;
 
     switch (e.record.wVirtualKeyCode) {
     case VK_LEFT:
-        delta = -deltaPerTick;
+        delta = -DELTA_PER_TICK;
         break;
     case VK_RIGHT:
-        delta = deltaPerTick;
+        delta = DELTA_PER_TICK;
         break;
     case VK_RETURN:
     case VK_SPACE:
@@ -481,7 +477,6 @@ static void fireButtonUpdate() {
 }
 
 static void gameFormUpdate() {
-    weaponAreaUpdate();
     moveAreaUpdate();
     fireButtonUpdate();
     angleAreaUpdate();
@@ -502,9 +497,8 @@ static void gameLoop() {
         controller->team = i + 1;
         match->players.push_back(controller);
 
-        for (const std::shared_ptr<Weapon> &weapon : TankMatch::weapons) {
-            controller->weapons.push_back(std::make_pair(weapon, 1));
-        }
+        for (const std::shared_ptr<Weapon> &weapon : TankMatch::weapons)
+            controller->weapons.push_back(std::make_pair(weapon, TankMatch::UNLIMITED_WEAPON_THRESHOLD));
     }
     match->arrangeTanks();
 
@@ -592,6 +586,7 @@ static void gameLoop() {
         gameFormUpdate();
 
         bottomArea->draw(*console);
+        weaponAreaDraw();
 
         if (match->isAiming) {
             gameForm->draw(*console, *bottomArea);

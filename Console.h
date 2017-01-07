@@ -90,6 +90,7 @@ namespace Hilltop {
                 unsigned short width, unsigned short height, unsigned short x, unsigned short y);
 
             virtual pixel_t get(unsigned short x, unsigned short y) const override;
+            virtual void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color) override;
             virtual void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color,
                 ConsoleColorType colorMask) override;
         };

@@ -264,7 +264,7 @@ void Hilltop::Game::Tracer::onDraw(TankMatch *match, Console::DoublePixelBuffere
 
 void Hilltop::Game::Tracer::onHit(TankMatch *match) {
     if (!hasHit) {
-        maxEntityAge = entityAge + tracerDuration;
+        maxEntityAge = entityAge + DURATION;
         gravityMult = 0.0f;
     }
 
@@ -312,7 +312,7 @@ Vector2 Hilltop::Game::Tank::getBarrelBase() {
 }
 
 Vector2 Hilltop::Game::Tank::getBarrelEnd() {
-    static const float ds2 = std::sqrtf(2.0) * 2.0f;
+    static const float DS2 = std::sqrtf(2.0) * 2.0f;
 
     float a = angle * PI / 180.0f;
     Vector2 p = getBarrelBase();
@@ -320,10 +320,10 @@ Vector2 Hilltop::Game::Tank::getBarrelEnd() {
     Vector2 c = { -std::sinf(a), std::cosf(a) };
     Vector2 c2 = { c.X * c.X, c.Y * c.Y };
     Vector2 subterm = { 2.0f + c2.X - c2.Y, 2.0f - c2.X + c2.Y };
-    Vector2 term1 = { subterm.X + c.X * ds2, subterm.Y + c.Y * ds2 };
-    Vector2 term2 = { subterm.X - c.X * ds2, subterm.Y - c.Y * ds2 };
-    Vector2 r = { 0.5f * (std::sqrtf(term1.X) - std::sqrtf(term2.X)),
-        0.5f * (std::sqrtf(term1.Y) - std::sqrtf(term2.Y)) };
+    Vector2 term1 = { subterm.X + c.X * DS2, subterm.Y + c.Y * DS2 };
+    Vector2 term2 = { subterm.X - c.X * DS2, subterm.Y - c.Y * DS2 };
+    Vector2 r = Vector2(std::sqrtf(term1.X) - std::sqrtf(term2.X),
+        std::sqrtf(term1.Y) - std::sqrtf(term2.Y)) * 0.5f;
 
     return p + r * 2.0f;
 }
@@ -546,6 +546,9 @@ std::shared_ptr<LastHitTracer> Hilltop::Game::LastHitTracer::create(TankControll
 
 void Hilltop::Game::LastHitTracer::onTick(TankMatch *match) {
     Entity::onTick(match);
+
+    player->lastHit = position.round();
+    player->hasLastHit = true;
 }
 
 void Hilltop::Game::LastHitTracer::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
@@ -554,13 +557,6 @@ void Hilltop::Game::LastHitTracer::onDraw(TankMatch *match, Console::DoublePixel
     Vector2 p = position.round();
     if (!player->isHuman)
         console.set(p.X, p.Y, RED);
-}
-
-void Hilltop::Game::LastHitTracer::onHit(TankMatch *match) {
-    Tracer::onHit(match);
-
-    player->lastHit = position.round();
-    player->hasLastHit = true;
 }
 
 
@@ -741,7 +737,7 @@ void Hilltop::Game::TankMatch::draw(Console::Console &console) {
     }
 
     if (isAiming) {
-        if (tickNumber % (aimReticleTime * 2) < aimReticleTime)
+        if (tickNumber % (AIM_RETICLE_TIME * 2) < AIM_RETICLE_TIME)
             players[currentPlayer]->tank->drawReticle(this, canvas);
     }
 
@@ -757,11 +753,11 @@ void Hilltop::Game::TankMatch::doTick() {
     
     updateMattered |= doEntityTick();
 
-    recentUpdateResult[tickNumber % recentUpdateCount] = updateMattered;
+    recentUpdateResult[tickNumber % RECENT_UPDATE_COUNT] = updateMattered;
 }
 
 bool Hilltop::Game::TankMatch::recentUpdatesMattered() {
-    for (int i = 0; i < recentUpdateCount; i++)
+    for (int i = 0; i < RECENT_UPDATE_COUNT; i++)
         if (recentUpdateResult[i])
             return true;
     return false;
@@ -771,7 +767,7 @@ void Hilltop::Game::TankMatch::fire() {
     std::shared_ptr<TankController> player = players[currentPlayer];
     std::pair<std::shared_ptr<Weapon>, int> &weapon = player->weapons[player->currentWeapon];
     weapon.first->fire(*this);
-    if (weapon.second < 99)
+    if (weapon.second < UNLIMITED_WEAPON_THRESHOLD)
         weapon.second--;
 }
 
