@@ -342,3 +342,12 @@ void Hilltop::UI::Form::drainInputQueue() {
         ReadConsoleInput(handle, &input, 1, &numEvents);
     }
 }
+
+void Hilltop::UI::Form::configureSimpleForm(Form &form) {
+    for (int i = 0; i < form.elements.size(); i++) {
+        if (i > 0)
+            form.mapping[i].left = form.mapping[i].top = i - 1;
+        if (i < form.elements.size() - 1)
+            form.mapping[i].right = form.mapping[i].bottom = i + 1;
+    }
+}

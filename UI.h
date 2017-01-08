@@ -17,7 +17,6 @@ namespace Hilltop {
         public:
             unsigned short width, height;
             unsigned short x, y;
-            bool active = false;
 
             virtual ~Element();
             static std::shared_ptr<Element> create();
@@ -152,6 +151,8 @@ namespace Hilltop {
             void draw(Console::BufferedConsole &console, ElementCollection &elements);
 
             static void drainInputQueue();
+
+            static void configureSimpleForm(Form &form);
         };
     }
 }

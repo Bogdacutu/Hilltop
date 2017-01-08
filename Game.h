@@ -200,6 +200,7 @@ namespace Hilltop {
 
             int angle = 45;
             int power = 50;
+            int health = 100;
 
             Vector2 getBarrelBase();
             Vector2 getBarrelEnd();
@@ -231,7 +232,7 @@ namespace Hilltop {
 
             Console::BufferedConsole::pixel_t icon[2];
 
-            virtual void fire(TankMatch &match);
+            virtual void fire(TankMatch &match, int playerNumber);
         };
 
 
@@ -244,7 +245,7 @@ namespace Hilltop {
 
             const int numRockets;
 
-            virtual void fire(TankMatch &match) override;
+            virtual void fire(TankMatch &match, int playerNumber) override;
         };
 
 
@@ -297,15 +298,16 @@ namespace Hilltop {
 
 
 
-        enum LandType : unsigned char {
-            AIR = 0,
-            GRASS,
-            DIRT,
-            NOTHING,
-            NUM_LAND_TYPES,
-        };
-
         class TankMatch {
+        public:
+            enum LandType : unsigned char {
+                AIR = 0,
+                GRASS,
+                DIRT,
+                NOTHING,
+                NUM_LAND_TYPES,
+            };
+
         private:
             std::vector<LandType> map;
 
@@ -321,6 +323,12 @@ namespace Hilltop {
             bool doLandPhysics();
 
         public:
+            enum FiringMode {
+                FIRE_SOLO,
+                FIRE_AS_TEAM,
+                FIRE_EVERYTHING,
+            };
+
             static const int UNLIMITED_WEAPON_THRESHOLD = 99;
 
             const unsigned short width, height;
@@ -333,6 +341,8 @@ namespace Hilltop {
             bool updateMattered = false;
             uint64_t tickNumber = 0;
             bool isAiming = true;
+
+            FiringMode firingMode = FIRE_EVERYTHING;
 
             static std::vector<std::shared_ptr<Weapon>> weapons;
             static void initalizeWeapons();
@@ -353,6 +363,7 @@ namespace Hilltop {
 
             void doTick();
             bool recentUpdatesMattered();
+            void fire(int playerNumber);
             void fire();
 
             int getNextPlayer();

@@ -18,7 +18,7 @@ using namespace Hilltop::Console;
 using namespace Hilltop::Game;
 using namespace Hilltop::UI;
 
-const unsigned short MENU_WIDTH = 80;
+const unsigned short MENU_WIDTH = 100;
 const unsigned short MENU_HEIGHT = 25;
 
 const unsigned short GAME_WIDTH = 200;
@@ -265,8 +265,9 @@ static bool weaponAreaAction(Form::event_args_t e) {
     }
 
     std::shared_ptr<TankController> player = match->players[match->currentPlayer];
-    player->currentWeapon = std::min(std::max(0, player->currentWeapon + delta),
-        (int)player->weapons.size() - 1);
+    player->currentWeapon = (player->currentWeapon + delta) % player->weapons.size();
+    if (player->currentWeapon < 0)
+        player->currentWeapon += (int)player->weapons.size();
 
     return delta != 0;
 }
@@ -465,7 +466,7 @@ static bool fireButtonAction(Form::event_args_t e) {
     match->fire();
     match->isAiming = false;
     match->doTick();
-    e.form.currentPos = 0;
+    e.form.currentPos = FIRE_BUTTON_TOP;
     e.form.isFocused = false;
     return true;
 }
@@ -484,6 +485,8 @@ static void gameFormUpdate() {
 }
 
 static void gameLoop() {
+    console = WindowsConsole::create(GetStdHandle(STD_OUTPUT_HANDLE), GAME_WIDTH, GAME_HEIGHT + 13);
+
     match = std::make_shared<TankMatch>(GAME_WIDTH - 4, GAME_HEIGHT * 2 - 4);
     match->buildMap([](float x) { return (std::sinf(x * 2 - 1.4f) + 1) / 2 + 0.1f; });
 
@@ -519,6 +522,7 @@ static void gameLoop() {
     bottomArea->y = 2;
     bottomArea->width = GAME_WIDTH - 4;
     bottomArea->height = 12;
+    bottomArea->backgroundColor = BLACK;
     bottomArea->drawBackground = true;
 
     buildGameUI(bottomArea.get());
@@ -550,6 +554,7 @@ static void gameLoop() {
     gameForm->actions[FIRE_BUTTON_BOTTOM] = fireButtonAction;
     gameForm->actions[ANGLE_AREA] = angleAreaAction;
     gameForm->actions[POWER_AREA] = powerAreaAction;
+    gameForm->currentPos = FIRE_BUTTON_TOP;
 
     // settle tanks
     do {
@@ -613,6 +618,148 @@ static void gameLoop() {
     }
 }
 
+static void callWithNewConsole(std::function<void()> func) {
+    std::shared_ptr<BufferedConsole> oldConsole = console;
+    console.reset();
+    func();
+    console = oldConsole;
+}
+
+static void drawMainMenuBackground(BufferedConsole &console) {
+    static const std::string LOGO[] = {
+        "XX     XX",
+        "XX     XX",
+        "XX     XX  XX  XX     XX    XXXXXX   XXXXX   XXXXXX",
+        "XX     XX  XX  XX     XX    XXXXXX  XXXXXXX  XXXXXXX",
+        "XXXXXXXXX  XX  XX     XX      XX   XXX   XXX XX   XX",
+        "XXXXXXXXX  XX  XX     XX      XX   XX     XX XXXXXXX",
+        "XX     XX  XX  XX     XX      XX   XXX   XXX XXXXXX",
+        "XX     XX  XX  XXXXXX XXXXXX  XX    XXXXXXX  XX",
+        "XX     XX  XX  XXXXXX XXXXXX  XX     XXXXX   XX",
+    };
+
+    static const int HILL[] = {
+        46, 46, 45, 45, 44, 44, 43, 43, 42, 42, 41, 41, 41, 40, 40, 39, 39, 38, 38, 37, 36, 35, 35, 34, 32, 31, 30, 28, 16, 4
+    };
+
+    DoublePixelBufferedConsole buffer(console.width, console.height * 2);
+
+    buffer.clear(DARK_BLUE);
+
+    for (int i = 0; i < sizeof(HILL) / sizeof(*HILL); i++)
+        for (int j = 0; j < HILL[i]; j++)
+            buffer.set(buffer.height - i - 1, buffer.width - HILL[i] + j, DARK_GREEN);
+
+    for (int i = 0; i < 7; i++)
+        buffer.set(buffer.height - sizeof(HILL) / sizeof(*HILL) + 1, buffer.width - 25 + i, RED);
+    for (int i = 0; i < 5; i++)
+        buffer.set(buffer.height - sizeof(HILL) / sizeof(*HILL), buffer.width - 24 + i, RED);
+    for (int i = 0; i < 3; i++)
+        buffer.set(buffer.height - sizeof(HILL) / sizeof(*HILL) - 3 + i, buffer.width - 25 + i, RED);
+
+    for (int i = 0; i < sizeof(LOGO) / sizeof(*LOGO); i++)
+        for (int j = 0; j < LOGO[i].length(); j++)
+            if (LOGO[i][j] != ' ')
+                buffer.set(i + 5, j + 5, WHITE);
+
+    buffer.commit(console);
+}
+
+enum {
+    NEW_GAME_OPTION,
+    LOAD_GAME_OPTION,
+    WEAPON_TEST_OPTION,
+    EXIT_GAME_OPTION,
+    NUM_MAIN_MENU_AREAS
+} MainMenuArea;
+
+static bool weaponTestAction(Form::event_args_t e) {
+    callWithNewConsole(gameLoop);
+    e.form.isFocused = false;
+    return true;
+}
+
+static bool exitGameAction(Form::event_args_t e) {
+    exit(0);
+    return true;
+}
+
+static void mainMenu() {
+    console = WindowsConsole::create(GetStdHandle(STD_OUTPUT_HANDLE), MENU_WIDTH, MENU_HEIGHT);
+
+
+    std::shared_ptr<ElementCollection> mainMenu = ElementCollection::create();
+    mainMenu->x = 10;
+    mainMenu->y = 6;
+    mainMenu->width = MENU_WIDTH / 2 - 12;
+    mainMenu->height = MENU_HEIGHT - 12;
+
+    std::shared_ptr<TextBox> newGameOption = TextBox::create();
+    newGameOption->x = 1;
+    newGameOption->y = 1;
+    newGameOption->width = mainMenu->width - 2;
+    newGameOption->height = 1;
+    newGameOption->text = "> New Game";
+    mainMenu->addChild(*newGameOption);
+
+    std::shared_ptr<TextBox> loadGameOption = TextBox::create();
+    loadGameOption->x = 4;
+    loadGameOption->y = 1;
+    loadGameOption->width = mainMenu->width - 2;
+    loadGameOption->height = 1;
+    loadGameOption->text = "> Load Game";
+    mainMenu->addChild(*loadGameOption);
+
+    std::shared_ptr<TextBox> weaponTestOption = TextBox::create();
+    weaponTestOption->x = 7;
+    weaponTestOption->y = 1;
+    weaponTestOption->width = mainMenu->width - 2;
+    weaponTestOption->height = 1;
+    weaponTestOption->text = "> Weapon Test";
+    mainMenu->addChild(*weaponTestOption);
+
+    std::shared_ptr<TextBox> exitGameOption = TextBox::create();
+    exitGameOption->x = 10;
+    exitGameOption->y = 1;
+    exitGameOption->width = mainMenu->width - 2;
+    exitGameOption->height = 1;
+    exitGameOption->text = "> Exit Game";
+    mainMenu->addChild(*exitGameOption);
+
+
+    std::shared_ptr<Form> mainMenuForm = std::make_shared<Form>(NUM_MAIN_MENU_AREAS);
+    mainMenuForm->elements[NEW_GAME_OPTION] = newGameOption;
+    mainMenuForm->elements[LOAD_GAME_OPTION] = loadGameOption;
+    mainMenuForm->elements[WEAPON_TEST_OPTION] = weaponTestOption;
+    mainMenuForm->elements[EXIT_GAME_OPTION] = exitGameOption;
+    Form::configureSimpleForm(*mainMenuForm);
+    mainMenuForm->actions[WEAPON_TEST_OPTION] = weaponTestAction;
+    mainMenuForm->actions[EXIT_GAME_OPTION] = exitGameAction;
+
+
+    ULONGLONG lastTime = GetTickCount64();
+
+    while (true) {
+        ULONGLONG nowTime = GetTickCount64();
+        int ticks = std::min<int>((int)((nowTime - lastTime) / GAME_TICK_MS), 10);
+        if (ticks < 1) {
+            Sleep(1);
+            continue;
+        }
+        lastTime = nowTime;
+
+        while (ticks--) {
+            mainMenuForm->tick();
+        }
+
+        drawMainMenuBackground(*console);
+        mainMenu->draw(*console);
+        mainMenuForm->draw(*console, *mainMenu);
+
+        console->commit();
+    }
+}
+
 int main() {
     srand(GetTickCount());
 
@@ -621,7 +768,5 @@ int main() {
     AttachConsole(-1);
     preventResizeWindow();
 
-    console = WindowsConsole::create(GetStdHandle(STD_OUTPUT_HANDLE), GAME_WIDTH, GAME_HEIGHT + 13);
-
-    gameLoop();
+    mainMenu();
 }

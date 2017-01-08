@@ -170,7 +170,7 @@ void Hilltop::Game::Explosion::destroyLand(TankMatch *match) {
     for (int i = p.X - size; i <= p.X + size; i++)
         for (int j = p.Y - size; j <= p.Y + size; j++)
             if (distance(Vector2(i, j), p) < size)
-                match->set(i, j, AIR);
+                match->set(i, j, TankMatch::AIR);
 }
 
 void Hilltop::Game::Explosion::createLand(TankMatch *match) {
@@ -178,8 +178,8 @@ void Hilltop::Game::Explosion::createLand(TankMatch *match) {
     for (int i = p.X - size; i <= p.X + size; i++)
         for (int j = p.Y - size; j <= p.Y + size; j++)
             if (distance(Vector2(i, j), p) < size)
-                if (match->get(i, j) == AIR)
-                    match->set(i, j, DIRT);
+                if (match->get(i, j) == TankMatch::AIR)
+                    match->set(i, j, TankMatch::DIRT);
 }
 
 std::shared_ptr<Explosion> Hilltop::Game::Explosion::create(int size, int damage) {
@@ -409,6 +409,9 @@ void Hilltop::Game::Tank::onDraw(TankMatch *match, Console::DoublePixelBufferedC
         console.set(p.X - 1, p.Y + i, color);
     for (int i = 1; i < 4; i++)
         console.set(p.X - 2, p.Y + i, color);
+
+    for (int i = 0; i < 9; i++)
+        console.set(p.X + 2, p.Y - 2 + i, health > i * 11 ? GREEN : RED);
 }
 
 void Hilltop::Game::Tank::drawReticle(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
@@ -436,7 +439,7 @@ void Hilltop::Game::Tank::doMove(TankMatch *match, int direction) {
     bool ret = true;
     for (int i = 1; i <= 2; i++) {
         for (int j = 0; j < 5; j++) {
-            if (match->get(p.X - i, p.Y + j) != AIR) {
+            if (match->get(p.X - i, p.Y + j) != TankMatch::AIR) {
                 ret = false;
                 break;
             }
@@ -448,7 +451,7 @@ void Hilltop::Game::Tank::doMove(TankMatch *match, int direction) {
         ret = true;
         for (int i = 1; i <= 2; i++) {
             for (int j = 0; j < 5; j++) {
-                if (match->get(p.X - i - 1, p.Y + j) != AIR) {
+                if (match->get(p.X - i - 1, p.Y + j) != TankMatch::AIR) {
                     ret = false;
                     break;
                 }
@@ -470,8 +473,8 @@ void Hilltop::Game::Tank::doMove(TankMatch *match, int direction) {
 
 const std::string Hilltop::Game::Weapon::INVALID_NAME = "<invalid name>";
 
-void Hilltop::Game::Weapon::fire(TankMatch &match) {
-    std::shared_ptr<TankController> player = match.players[match.currentPlayer];
+void Hilltop::Game::Weapon::fire(TankMatch &match, int playerNumber) {
+    std::shared_ptr<TankController> player = match.players[playerNumber];
     std::shared_ptr<LastHitTracer> tracer = LastHitTracer::create(*player);
     tracer->position = player->tank->getProjectileBase();
     tracer->direction = player->tank->calcTrajectory();
@@ -494,10 +497,10 @@ std::shared_ptr<SimpleRocket> Hilltop::Game::RocketWeapon::createRocket(Vector2 
 
 Hilltop::Game::RocketWeapon::RocketWeapon(int numRockets) : Weapon(), numRockets(numRockets) {}
 
-void Hilltop::Game::RocketWeapon::fire(TankMatch &match) {
-    Weapon::fire(match);
+void Hilltop::Game::RocketWeapon::fire(TankMatch &match, int playerNumber) {
+    Weapon::fire(match, playerNumber);
 
-    std::shared_ptr<Tank> tank = match.players[match.currentPlayer]->tank;
+    std::shared_ptr<Tank> tank = match.players[playerNumber]->tank;
     std::shared_ptr<Entity> rocket = createRocket(tank->getProjectileBase(), tank->calcTrajectory());
     match.addEntity(*rocket);
 }
@@ -565,7 +568,8 @@ void Hilltop::Game::LastHitTracer::onDraw(TankMatch *match, Console::DoublePixel
 // TankMatch
 //
 
-static const ConsoleColor LAND_COLORS[NUM_LAND_TYPES] = { DARK_BLUE, DARK_GREEN, BROWN, BLACK };
+static const ConsoleColor LAND_COLORS[TankMatch::NUM_LAND_TYPES] =
+    { DARK_BLUE, DARK_GREEN, BROWN, BLACK };
 
 bool Hilltop::Game::TankMatch::doEntityTick() {
     bool ret = false;
@@ -655,12 +659,12 @@ void Hilltop::Game::TankMatch::initalizeWeapons() {
             __debugbreak();
 }
 
-LandType Hilltop::Game::TankMatch::get(int x, int y) {
+TankMatch::LandType Hilltop::Game::TankMatch::get(int x, int y) {
     if (x < 0 || x >= height || y < 0 || y >= width) {
         if (x >= height)
-            return DIRT;
+            return TankMatch::DIRT;
         else
-            return AIR;
+            return TankMatch::AIR;
     }
 
     return map[x * width + y];
@@ -763,12 +767,35 @@ bool Hilltop::Game::TankMatch::recentUpdatesMattered() {
     return false;
 }
 
-void Hilltop::Game::TankMatch::fire() {
-    std::shared_ptr<TankController> player = players[currentPlayer];
+void Hilltop::Game::TankMatch::fire(int playerNumber) {
+    std::shared_ptr<TankController> player = players[playerNumber];
     std::pair<std::shared_ptr<Weapon>, int> &weapon = player->weapons[player->currentWeapon];
-    weapon.first->fire(*this);
+    weapon.first->fire(*this, playerNumber);
     if (weapon.second < UNLIMITED_WEAPON_THRESHOLD)
         weapon.second--;
+}
+
+void Hilltop::Game::TankMatch::fire() {
+    if (firingMode == FIRE_SOLO) {
+        fire(currentPlayer);
+    } else if (firingMode == FIRE_AS_TEAM) {
+        bool found = false;
+        for (int i = currentPlayer + 1; i < players.size(); i++) {
+            if (players[i]->team == players[currentPlayer]->team) {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+            for (int i = 0; i < players.size(); i++)
+                if (players[i]->team == players[currentPlayer]->team)
+                    fire(i);
+    } else if (firingMode == FIRE_EVERYTHING) {
+        if (currentPlayer == players.size() - 1)
+            for (int i = 0; i < players.size(); i++)
+                fire(i);
+    }
 }
 
 int Hilltop::Game::TankMatch::getNextPlayer() {

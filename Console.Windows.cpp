@@ -66,7 +66,7 @@ static void setGameBufferProps(HANDLE buffer) {
     info.ColorTable[DARK_GRAY] = RGB(95, 87, 79);
     info.ColorTable[GRAY] = RGB(194, 195, 199);
     info.ColorTable[WHITE] = RGB(255, 255, 255);
-    info.ColorTable[RED] = RGB(255, 0, 71);
+    info.ColorTable[RED] = RGB(225, 0, 0);
     info.ColorTable[ORANGE] = RGB(255, 163, 0);
     info.ColorTable[YELLOW] = RGB(255, 236, 39);
     info.ColorTable[GREEN] = RGB(0, 228, 54);
