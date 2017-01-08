@@ -194,7 +194,7 @@ Hilltop::UI::Form::Form(int numElements)
     : mapping(numElements), actions(numElements), elements(numElements) {}
 
 bool Hilltop::UI::Form::doAction(KEY_EVENT_RECORD record) {
-    event_args_t args(*this);
+    event_args_t args(this);
 
     args.type = KEY;
     args.position = currentPos;
@@ -207,12 +207,26 @@ bool Hilltop::UI::Form::doAction(KEY_EVENT_RECORD record) {
 }
 
 bool Hilltop::UI::Form::doAction(bool focused) {
-    event_args_t args(*this);
+    event_args_t args(this);
 
     args.type = focused ? FOCUS : BLUR;
 
     if (actions[currentPos])
         return actions[currentPos](args);
+
+    return false;
+}
+
+bool Hilltop::UI::Form::doDefaultAction(KEY_EVENT_RECORD record, std::function<void(event_args_t)> action) {
+    event_args_t args;
+
+    args.type = KEY;
+    args.record = record;
+
+    if (action) {
+        action(args);
+        return true;
+    }
 
     return false;
 }
@@ -250,9 +264,15 @@ void Hilltop::UI::Form::switchCurrent(int destination) {
     currentPos = destination;
 }
 
-void Hilltop::UI::Form::handleKeyEvent(KEY_EVENT_RECORD record) {
+void Hilltop::UI::Form::handleKeyEvent(bool active, KEY_EVENT_RECORD record,
+    std::function<void(event_args_t)> defaultAction) {
     if (!record.bKeyDown)
         return;
+
+    if (!active) {
+        doDefaultAction(record, defaultAction);
+        return;
+    }
 
     if (isFocused) {
         switch (record.wVirtualKeyCode) {
@@ -289,11 +309,13 @@ void Hilltop::UI::Form::handleKeyEvent(KEY_EVENT_RECORD record) {
             isFocused = true;
             doAction(true);
             break;
+        default:
+            doDefaultAction(record, defaultAction);
         }
     }
 }
 
-void Hilltop::UI::Form::tick() {
+void Hilltop::UI::Form::tick(bool active, std::function<void(event_args_t)> defaultAction) {
     tickCounter++;
 
     HANDLE handle = GetStdHandle(STD_INPUT_HANDLE);
@@ -308,7 +330,7 @@ void Hilltop::UI::Form::tick() {
         ReadConsoleInput(handle, &input, 1, &numEvents);
         switch (input.EventType) {
         case KEY_EVENT:
-            handleKeyEvent(input.Event.KeyEvent);
+            handleKeyEvent(active, input.Event.KeyEvent, defaultAction);
             break;
         }
     }
@@ -326,20 +348,6 @@ void Hilltop::UI::Form::draw(Console::BufferedConsole &console, ElementCollectio
             drawThinOuterRectangle(console, elements[currentPos]->width + 4,
                 elements[currentPos]->height + 2, x - 1, y - 2, c);
         }
-    }
-}
-
-void Hilltop::UI::Form::drainInputQueue() {
-    HANDLE handle = GetStdHandle(STD_INPUT_HANDLE);
-
-    while (true) {
-        DWORD numEvents = 0;
-        GetNumberOfConsoleInputEvents(handle, &numEvents);
-        if (numEvents <= 0)
-            break;
-
-        INPUT_RECORD input = {};
-        ReadConsoleInput(handle, &input, 1, &numEvents);
     }
 }
 

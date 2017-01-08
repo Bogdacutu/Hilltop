@@ -89,8 +89,13 @@ static void setGameBufferProps(HANDLE buffer) {
 // WindowsConsole
 //
 
-Hilltop::Console::WindowsConsole::WindowsConsole(HANDLE handle, unsigned short width, unsigned short height,
-    unsigned short minFont, unsigned short maxFont) : BufferedConsole(width, height), handle(handle) {
+Hilltop::Console::WindowsConsole::WindowsConsole(HANDLE handle, unsigned short width,
+    unsigned short height, unsigned short minFont, unsigned short maxFont)
+    : BufferedNativeConsole(width, height), handle(handle), minFont(minFont), maxFont(maxFont) {
+    configure();
+}
+
+void Hilltop::Console::WindowsConsole::configure() const {
     setGameBufferProps(handle);
     resizeWithAutoFont(handle, width, height, minFont, maxFont);
 }

@@ -122,12 +122,12 @@ namespace Hilltop {
             };
 
             struct event_args_t {
-                Form &form;
+                Form *form = nullptr;
                 int position;
                 EventType type;
                 KEY_EVENT_RECORD record = {};
 
-                event_args_t(Form &form) : form(form) {}
+                event_args_t(Form *form = nullptr) : form(form) {}
             };
 
             std::vector<mapping_t> mapping;
@@ -143,14 +143,15 @@ namespace Hilltop {
 
             bool doAction(KEY_EVENT_RECORD record);
             bool doAction(bool focused);
+            static bool doDefaultAction(KEY_EVENT_RECORD record, std::function<void(event_args_t)> action);
             void doDirectionSwitch(KEY_EVENT_RECORD record, Direction direction);
             void switchCurrent(int destination);
-            void handleKeyEvent(KEY_EVENT_RECORD record);
+            void handleKeyEvent(bool active, KEY_EVENT_RECORD record,
+                std::function<void(event_args_t)> defaultAction);
 
-            void tick();
+            void tick(bool active = true, std::function<void(event_args_t)> defaultAction =
+                std::function<void(event_args_t)>());
             void draw(Console::BufferedConsole &console, ElementCollection &elements);
-
-            static void drainInputQueue();
 
             static void configureSimpleForm(Form &form);
         };

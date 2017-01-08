@@ -75,6 +75,15 @@ namespace Hilltop {
         };
 
 
+        class BufferedNativeConsole : public BufferedConsole {
+        protected:
+            BufferedNativeConsole(unsigned short width, unsigned short height);
+
+        public:
+            virtual void configure() const;
+        };
+
+
         class BufferedConsoleRegion final : public BufferedConsole {
         protected:
             BufferedConsoleRegion(BufferedConsole &console, unsigned short width, unsigned short height,
@@ -93,6 +102,28 @@ namespace Hilltop {
             virtual void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color) override;
             virtual void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color,
                 ConsoleColorType colorMask) override;
+        };
+
+
+        class SnapshotConsole final : public BufferedConsole {
+        private:
+            std::vector<pixel_t> buffer = std::vector<pixel_t>(width * height);
+
+        protected:
+            SnapshotConsole(BufferedConsole &console);
+
+        public:
+            const std::shared_ptr<BufferedConsole> console;
+
+            static std::shared_ptr<SnapshotConsole> create(BufferedConsole &console);
+
+            virtual pixel_t get(unsigned short x, unsigned short y) const override;
+            virtual void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color) override;
+            virtual void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color,
+                ConsoleColorType colorMask) override;
+            virtual void clear(ConsoleColor color) override;
+
+            virtual void commit() const override;
         };
 
         

@@ -700,7 +700,7 @@ void Hilltop::Game::TankMatch::arrangeTanks() {
     int leftBound = 10;
     int rightBound = width - 1 - 10 - 4;
     for (int i = 0; i < players.size(); i++) {
-        int left = scale(i, 0, players.size() - 1, leftBound, rightBound);
+        int left = scale(i, 0, std::max(1, (int)players.size() - 1), leftBound, rightBound);
         players[i]->tank->position = Vector2(-1, left);
         players[i]->tank->initWheels(*this);
 
@@ -748,7 +748,7 @@ void Hilltop::Game::TankMatch::draw(Console::Console &console) {
     canvas.commit(console);
 }
 
-void Hilltop::Game::TankMatch::doTick() {
+void Hilltop::Game::TankMatch::tick() {
     tickNumber++;
     updateMattered = false;
 

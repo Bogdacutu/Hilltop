@@ -361,7 +361,7 @@ namespace Hilltop {
             
             void draw(Console::Console &console);
 
-            void doTick();
+            void tick();
             bool recentUpdatesMattered();
             void fire(int playerNumber);
             void fire();
