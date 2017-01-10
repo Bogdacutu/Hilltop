@@ -1005,18 +1005,202 @@ enum PlayerTeam {
     TEAM_YELLOW = 4,
 };
 
+const char *PLAYER_TEAM_NAMES[] = {
+    "invalid",
+    "Blue",
+    "Green",
+    "Red",
+    "Yellow"
+};
+
+enum TankAttribute {
+    TANK_HEALTH,
+    TANK_STAMINA,
+    TANK_STRENGTH,
+    TANK_ARMOR,
+    NUM_TANK_ATTRIBUTES,
+};
+
+const int MIN_TANK_ATTRIBUTE_VALUE = 1;
+const int MAX_TANK_ATTRIBUTE_VALUE = 7;
+const int DEFAULT_TANK_ATTRIBUTE_VALUE = 4;
+const int TANK_ATTRIBUTE_SUM = NUM_TANK_ATTRIBUTES * DEFAULT_TANK_ATTRIBUTE_VALUE;
+
+const char *TANK_ATTRIBUTE_NAMES[] = {
+    "Health",
+    "Stamina",
+    "Strength",
+    "Armor"
+};
+
 struct {
     struct {
         bool enabled = false;
         bool human = false;
         int team;
-        struct {
-
-        } tank[4];
+        int tank[NUM_TANK_ATTRIBUTES];
     } players[4];
 } newGameSettings;
 
+int activeTankAttribute = 0;
+
+std::shared_ptr<Form> customizeForm;
+std::shared_ptr<TextBox> customizeAttrLabel[NUM_TANK_ATTRIBUTES];
+std::shared_ptr<TextBox> customizeControls[NUM_TANK_ATTRIBUTES];
+
 bool exitNewGame = false;
+
+static void updateCustomizeControls(int index) {
+    activeTankAttribute = customizeForm->currentPos;
+
+    for (int i = 0; i < NUM_TANK_ATTRIBUTES; i++) {
+        ConsoleColor color = GRAY;
+        if (i == activeTankAttribute)
+            color = YELLOW;
+        customizeAttrLabel[i]->color = color;
+        customizeControls[i]->color = color;
+    }
+}
+
+static int getTankAttributeSum(int index) {
+    int sum = 0;
+    for (int i = 0; i < NUM_TANK_ATTRIBUTES; i++)
+        sum += newGameSettings.players[index].tank[i];
+    return sum;
+}
+
+static void drawTankAttributes(BufferedConsole &console, int index) {
+    std::shared_ptr<BufferedConsole> buf = BufferedConsoleRegion::create(console,
+        MENU_WIDTH / 2 + 10, MENU_HEIGHT - 12, 10, 5);
+
+    for (int i = 0; i < NUM_TANK_ATTRIBUTES; i++) {
+        ConsoleColor color = WHITE;
+        if (i == activeTankAttribute)
+            color = YELLOW;
+        color = make_bg_color(color);
+        for (int j = 0; j < newGameSettings.players[index].tank[i]; j++) {
+            buf->set(3 + i * 2, 20 + j * 3, L' ', color);
+            buf->set(3 + i * 2, 21 + j * 3, L' ', color);
+        }
+    }
+}
+
+static bool customizeFormAction(int index, Form::event_args_t e) {
+    if (e.type == Form::KEY) {
+        int delta = 0;
+
+        switch (e.record.wVirtualKeyCode) {
+        case VK_LEFT:
+            delta = -1;
+            break;
+        case VK_RIGHT:
+            delta = 1;
+            break;
+        }
+
+        int sum = getTankAttributeSum(index);
+        if (sum + delta <= TANK_ATTRIBUTE_SUM) {
+            int val = newGameSettings.players[index].tank[activeTankAttribute] + delta;
+            val = std::min(MAX_TANK_ATTRIBUTE_VALUE, std::max(MIN_TANK_ATTRIBUTE_VALUE, val));
+            newGameSettings.players[index].tank[activeTankAttribute] = val;
+        }
+    }
+
+    e.form->isFocused = false;
+    return true;
+}
+
+static void customizeTankMenu(int index) {
+    activeTankAttribute = 0;
+
+    std::shared_ptr<ElementCollection> tankMenu = ElementCollection::create();
+    tankMenu->width = MENU_WIDTH / 2 + 10;
+    tankMenu->height = MENU_HEIGHT - 12;
+    tankMenu->x = 10;
+    tankMenu->y = 5;
+
+    std::shared_ptr<Button> blueBg = Button::create();
+    blueBg->width = MENU_WIDTH / 2 - 3;
+    blueBg->height = MENU_HEIGHT - 12;
+    blueBg->x = 0;
+    blueBg->y = 0;
+    blueBg->backgroundColor = DARK_BLUE;
+    tankMenu->addChild(*blueBg);
+
+    std::shared_ptr<TextBox> title = TextBox::create();
+    title->width = tankMenu->width;
+    title->height = 1;
+    title->x = 0;
+    title->y = 0;
+    title->color = WHITE;
+    title->alignment = CENTER;
+    std::ostringstream titleText;
+    titleText << "Tank " << (index + 1);
+    titleText << " - ";
+    titleText << PLAYER_TEAM_NAMES[newGameSettings.players[index].team] << " Team";
+    title->text = titleText.str();
+    tankMenu->addChild(*title);
+    
+    for (int i = 0; i < NUM_TANK_ATTRIBUTES; i++) {
+        customizeAttrLabel[i] = TextBox::create();
+        customizeAttrLabel[i]->width = 10;
+        customizeAttrLabel[i]->height = 1;
+        customizeAttrLabel[i]->x = 3 + i * 2;
+        customizeAttrLabel[i]->y = 0;
+        customizeAttrLabel[i]->color = WHITE;
+        customizeAttrLabel[i]->alignment = RIGHT;
+        customizeAttrLabel[i]->text = TANK_ATTRIBUTE_NAMES[i];
+        tankMenu->addChild(*customizeAttrLabel[i]);
+
+        customizeControls[i] = TextBox::create();
+        customizeControls[i]->width = 26;
+        customizeControls[i]->height = 1;
+        customizeControls[i]->x = 3 + i * 2;
+        customizeControls[i]->y = 17;
+        customizeControls[i]->color = WHITE;
+        customizeControls[i]->text = " <" + std::string(22, ' ') + "> ";
+        tankMenu->addChild(*customizeControls[i]);
+    }
+
+    customizeForm = std::make_shared<Form>(NUM_TANK_ATTRIBUTES);
+    for (int i = 0; i < NUM_TANK_ATTRIBUTES; i++) {
+        customizeForm->elements[i] = customizeControls[i];
+
+        if (i > 0)
+            customizeForm->mapping[i].top = i - 1;
+        if (i < NUM_TANK_ATTRIBUTES - 1)
+            customizeForm->mapping[i].bottom = i + 1;
+        customizeForm->mapping[i].left = customizeForm->mapping[i].right = Form::ACT_WITHOUT_FOCUS;
+
+        customizeForm->actions[i] = [index](Form::event_args_t e)->bool {
+            return customizeFormAction(index, e);
+        };
+    }
+
+    bool exitCustomize = false;
+
+    tickLoop([&]() {
+        customizeForm->tick(true, [&](Form::event_args_t e) {
+            if (e.type == Form::KEY && e.record.wVirtualKeyCode == VK_ESCAPE)
+                exitCustomize = true;
+        });
+    }, [&]()->bool {
+        if (exitCustomize)
+            return false;
+
+        console->clear(BLACK);
+
+        updateCustomizeControls(index);
+
+        tankMenu->draw(*console);
+        customizeForm->draw(*console, *tankMenu);
+
+        drawTankAttributes(*console, index);
+
+        console->commit();
+        return true;
+    });
+}
 
 static bool newGameValid() {
     bool haveBot = false;
@@ -1046,22 +1230,7 @@ static void updateNewGameMenu() {
         playerType[i]->text = type;
         playerType[i]->color = playerText[i]->color;
         
-        std::string team;
-        switch (newGameSettings.players[i].team) {
-        case TEAM_BLUE:
-            team = "Blue";
-            break;
-        case TEAM_GREEN:
-            team = "Green";
-            break;
-        case TEAM_RED:
-            team = "Red";
-            break;
-        case TEAM_YELLOW:
-            team = "Yellow";
-            break;
-        }
-        playerTeam[i]->text = team;
+        playerTeam[i]->text = PLAYER_TEAM_NAMES[newGameSettings.players[i].team];
         playerTeam[i]->color = color;
 
         playerTank[i]->color = color;
@@ -1233,8 +1402,10 @@ static void newGameMenu() {
         };
 
         newGameForm->actions[i * NUM_PLAYER_NEW_GAME_AREAS + TANK_CUSTOMIZE_OPTION] = [](Form::event_args_t e)->bool {
-            // TODO: customize
-            
+            callWithConsoleSnapshot([e]() {
+                customizeTankMenu(e.position / NUM_PLAYER_NEW_GAME_AREAS);
+            });
+
             e.form->isFocused = false;
             return true;
         };
@@ -1391,8 +1562,11 @@ int main() {
     newGameSettings.players[0].enabled = true;
     newGameSettings.players[0].human = true;
     newGameSettings.players[1].enabled = true;
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 4; i++) {
         newGameSettings.players[i].team = i + 1;
+        for (int j = 0; j < NUM_TANK_ATTRIBUTES; j++)
+            newGameSettings.players[i].tank[j] = DEFAULT_TANK_ATTRIBUTE_VALUE;
+    }
 
     AttachConsole(-1);
     preventResizeWindow();
