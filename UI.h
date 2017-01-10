@@ -25,7 +25,7 @@ namespace Hilltop {
         };
 
 
-        class ElementCollection final : public Element {
+        class ElementCollection : public Element {
         protected:
             ElementCollection();
 
@@ -61,7 +61,7 @@ namespace Hilltop {
         };
 
 
-        class Button final : public TextBox {
+        class Button : public TextBox {
         protected:
             Button();
 
@@ -74,7 +74,7 @@ namespace Hilltop {
         };
 
 
-        class ProgressBar final : public Element {
+        class ProgressBar : public Element {
         protected:
             ProgressBar();
 

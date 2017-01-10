@@ -1,15 +1,36 @@
 ﻿#include "Console.h"
 #include "Console.Windows.h"
-#include "Game.h"
 #include "UI.h"
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/serialization/export.hpp>
 #include <deque>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <sstream>
-#include <Windows.h>
 
+#include <Windows.h>
 #undef min
 #undef max
+
+
+#include "Game.h"
+
+BOOST_CLASS_EXPORT(Hilltop::Game::Entity)
+BOOST_CLASS_EXPORT(Hilltop::Game::SimpleRocket)
+BOOST_CLASS_EXPORT(Hilltop::Game::SimpleTrailedRocket)
+BOOST_CLASS_EXPORT(Hilltop::Game::RocketTrail)
+BOOST_CLASS_EXPORT(Hilltop::Game::Explosion)
+BOOST_CLASS_EXPORT(Hilltop::Game::Tracer)
+BOOST_CLASS_EXPORT(Hilltop::Game::TankWheel)
+BOOST_CLASS_EXPORT(Hilltop::Game::Tank)
+BOOST_CLASS_EXPORT(Hilltop::Game::LastHitTracer)
+
+BOOST_CLASS_EXPORT(Hilltop::Game::Weapon)
+BOOST_CLASS_EXPORT(Hilltop::Game::RocketWeapon)
+BOOST_CLASS_EXPORT(Hilltop::Game::DirtRocketWeapon)
+
 
 #define GAME_TICKS_PER_SEC 20
 #define GAME_TICK_MS (1000 / GAME_TICKS_PER_SEC)
@@ -125,6 +146,18 @@ static void callWithConsoleSnapshot(std::function<void()> func) {
     });
 }
 
+static void saveGame() {
+    std::ofstream fout("save.txt");
+    boost::archive::text_oarchive archive(fout);
+    archive << match;
+}
+
+static void loadGame() {
+    std::ifstream fin("save.txt");
+    boost::archive::text_iarchive archive(fin);
+    archive >> match;
+}
+
 enum PauseScreenArea {
     PAUSED_RESUME_OPTION,
     PAUSED_LOAD_GAME_OPTION,
@@ -230,6 +263,16 @@ static void pauseScreen() {
     form->elements[PAUSED_EXIT_GAME_OPTION] = exitGameOption;
     Form::configureSimpleForm(*form);
     form->actions[PAUSED_RESUME_OPTION] = [&stopPause](Form::event_args_t e)->bool {
+        stopPause = true;
+        return true;
+    };
+    form->actions[PAUSED_LOAD_GAME_OPTION] = [&stopPause](Form::event_args_t e)->bool {
+        loadGame();
+        stopPause = true;
+        return true;
+    };
+    form->actions[PAUSED_SAVE_GAME_OPTION] = [&stopPause](Form::event_args_t e)->bool {
+        saveGame();
         stopPause = true;
         return true;
     };
@@ -944,7 +987,7 @@ static bool startGameAction(Form::event_args_t e) {
                 match->players.push_back(controller);
 
                 for (int i = 0; i < START_WEAPONS; i++) {
-                    const int idx = scale(rand(), 0, RAND_MAX, 0, TankMatch::weapons.size());
+                    const int idx = (int)scale((float)rand(), 0, RAND_MAX, 0, (float)TankMatch::weapons.size());
                     controller->addWeapon(TankMatch::weapons[idx], 1);
                 }
             }

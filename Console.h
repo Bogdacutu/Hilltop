@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/serialization/access.hpp>
 #include <memory>
 #include <vector>
 
@@ -63,10 +64,19 @@ namespace Hilltop {
             BufferedConsole(unsigned short width, unsigned short height);
 
         public:
-            typedef struct {
+            struct pixel_t {
+            private:
+                friend class boost::serialization::access;
+                template<class Archive>
+                void serialize(Archive &ar, const unsigned int version) {
+                    ar & ch;
+                    ar & color;
+                }
+
+            public:
                 wchar_t ch;
                 ConsoleColor color;
-            } pixel_t;
+            };
 
             virtual pixel_t get(unsigned short x, unsigned short y) const = 0;
             virtual void set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color) override;
@@ -84,7 +94,7 @@ namespace Hilltop {
         };
 
 
-        class BufferedConsoleRegion final : public BufferedConsole {
+        class BufferedConsoleRegion : public BufferedConsole {
         protected:
             BufferedConsoleRegion(BufferedConsole &console, unsigned short width, unsigned short height,
                 unsigned short x, unsigned short y);
@@ -105,7 +115,7 @@ namespace Hilltop {
         };
 
 
-        class SnapshotConsole final : public BufferedConsole {
+        class SnapshotConsole : public BufferedConsole {
         private:
             std::vector<pixel_t> buffer = std::vector<pixel_t>(width * height);
 

@@ -1,6 +1,13 @@
 #pragma once
 
 #include "Console.h"
+#include <boost/serialization/access.hpp>
+#include <boost/serialization/base_object.hpp>
+#include <boost/serialization/deque.hpp>
+#include <boost/serialization/queue.hpp>
+#include <boost/serialization/shared_ptr.hpp>
+#include <boost/serialization/utility.hpp>
+#include <boost/serialization/vector.hpp>
 #include <functional>
 #include <memory>
 #include <queue>
@@ -12,7 +19,16 @@ namespace Hilltop {
 
         float scale(float value, float fromLow, float fromHigh, float toLow, float toHigh);
 
-        struct Vector2 {
+        class Vector2 {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & X;
+                ar & Y;
+            }
+
+        public:
             float X = 0;
             float Y = 0;
 
@@ -67,6 +83,19 @@ namespace Hilltop {
 
 
         class Entity : public std::enable_shared_from_this<Entity> {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & position;
+                ar & direction;
+                ar & gravityMult;
+                ar & groundHog;
+                ar & hasHit;
+                ar & entityAge;
+                ar & maxEntityAge;
+            }
+
         protected:
             Entity();
 
@@ -91,6 +120,18 @@ namespace Hilltop {
 
 
         class SimpleRocket : public Entity {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            friend inline void load_construct_data(Archive &ar, SimpleRocket *t, const unsigned int);
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Entity>(*this);
+                ar & color;
+                ar & destroyLand;
+                ar & createLand;
+            }
+
         protected:
             SimpleRocket(ConsoleColor color);
 
@@ -106,8 +147,24 @@ namespace Hilltop {
             virtual void onHit(TankMatch *match) override;
         };
 
+        template<class Archive>
+        inline void load_construct_data(Archive &ar, SimpleRocket *t, const unsigned int) {
+            ::new(t) SimpleRocket(ConsoleColor());
+        }
 
-        class SimpleTrailedRocket final : public SimpleRocket {
+
+        class SimpleTrailedRocket : public SimpleRocket {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            friend inline void load_construct_data(Archive &ar, SimpleTrailedRocket *t, const unsigned int);
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<SimpleRocket>(*this);
+                ar & trailColor;
+                ar & trailTime;
+            }
+
         protected:
             SimpleTrailedRocket(ConsoleColor color, ConsoleColor trailColor, int trailTime);
 
@@ -120,8 +177,23 @@ namespace Hilltop {
             virtual void onTick(TankMatch *match) override;
         };
 
+        template<class Archive>
+        inline void load_construct_data(Archive &ar, SimpleTrailedRocket *t, const unsigned int) {
+            ::new(t) SimpleTrailedRocket(ConsoleColor(), ConsoleColor(), 0);
+        }
 
-        class RocketTrail final : public Entity {
+
+        class RocketTrail : public Entity {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            friend inline void load_construct_data(Archive &ar, RocketTrail *t, const unsigned int);
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Entity>(*this);
+                ar & color;
+            }
+
         protected:
             RocketTrail(int maxAge, ConsoleColor color);
 
@@ -133,12 +205,29 @@ namespace Hilltop {
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
         };
 
+        template<class Archive>
+        inline void load_construct_data(Archive &ar, RocketTrail *t, const unsigned int) {
+            ::new(t) RocketTrail(0, ConsoleColor());
+        }
 
-        class Explosion final : public Entity {
+
+
+
+        class Explosion : public Entity {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            friend inline void load_construct_data(Archive &ar, Explosion *t, const unsigned int);
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Entity>(*this);
+                ar & coreSize;
+            }
+
         protected:
             Explosion(int size, int damage);
 
-            const int ticksBetween = 2;
+            static const int ticksBetween = 2;
 
             void destroyLand(TankMatch *match);
             void createLand(TankMatch *match);
@@ -157,8 +246,30 @@ namespace Hilltop {
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
         };
 
+        template<class Archive>
+        inline void save_construct_data(Archive &ar, const Explosion *t, const unsigned int) {
+            ar << t->size;
+            ar << t->damage;
+        }
+
+        template<class Archive>
+        void load_construct_data(Archive &ar, Explosion *t, const unsigned int) {
+            int size, damage;
+            ar >> size;
+            ar >> damage;
+            ::new(t) Explosion(size, damage);
+        }
+
 
         class Tracer : public Entity {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Entity>(*this);
+                ar & text;
+            }
+
         protected:
             Tracer();
 
@@ -175,7 +286,14 @@ namespace Hilltop {
         };
 
 
-        class TankWheel final : public Entity {
+        class TankWheel : public Entity {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Entity>(*this);
+            }
+
         protected:
             TankWheel();
 
@@ -188,7 +306,22 @@ namespace Hilltop {
         };
 
 
-        class Tank final : public Entity {
+        class Tank : public Entity {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            friend inline void load_construct_data(Archive &ar, Tank *t, const unsigned int);
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Entity>(*this);
+                ar & color;
+                ar & barrelColor;
+                ar & wheels;
+                ar & angle;
+                ar & power;
+                ar & health;
+            }
+
         protected:
             Tank(ConsoleColor color, ConsoleColor barrelColor);
 
@@ -222,9 +355,22 @@ namespace Hilltop {
             void doMove(TankMatch *match, int direction);
         };
 
+        template<class Archive>
+        inline void load_construct_data(Archive &ar, Tank *t, const unsigned int) {
+            ::new(t) Tank(ConsoleColor(), ConsoleColor());
+        }
+
 
 
         class Weapon {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & name;
+                ar & icon;
+            }
+
         public:
             static const std::string INVALID_NAME;
 
@@ -237,6 +383,15 @@ namespace Hilltop {
 
 
         class RocketWeapon : public Weapon {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            friend inline void load_construct_data(Archive &ar, RocketWeapon *t, const unsigned int);
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Weapon>(*this);
+            }
+
         protected:
             virtual std::shared_ptr<SimpleRocket> createRocket(Vector2 position, Vector2 direction);
             
@@ -248,8 +403,29 @@ namespace Hilltop {
             virtual void fire(TankMatch &match, int playerNumber) override;
         };
 
+        template<class Archive>
+        inline void save_construct_data(Archive &ar, const RocketWeapon *t, const unsigned int) {
+            ar << t->numRockets;
+        }
 
-        class DirtRocketWeapon final : public RocketWeapon {
+        template<class Archive>
+        inline void load_construct_data(Archive &ar, RocketWeapon *t, const unsigned int) {
+            int numRockets;
+            ar >> numRockets;
+            ::new(t) RocketWeapon(numRockets);
+        }
+
+
+        class DirtRocketWeapon : public RocketWeapon {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            friend inline void load_construct_data(Archive &ar, DirtRocketWeapon *t, const unsigned int);
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<RocketWeapon>(*this);
+            }
+
         protected:
             virtual std::shared_ptr<SimpleRocket> createRocket(Vector2 position, Vector2 direction) override;
 
@@ -257,9 +433,28 @@ namespace Hilltop {
             DirtRocketWeapon(int numRockets);
         };
 
+        template<class Archive>
+        inline void load_construct_data(Archive &ar, DirtRocketWeapon *t, const unsigned int) {
+            ::new(t) DirtRocketWeapon(0);
+        }
+
 
 
         class TankController : public std::enable_shared_from_this<TankController> {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & tank;
+                ar & team;
+                ar & isHuman;
+                ar & currentWeapon;
+                ar & movesLeft;
+                ar & lastHit;
+                ar & hasLastHit;
+                ar & weapons;
+            }
+
         protected:
             TankController();
 
@@ -272,12 +467,10 @@ namespace Hilltop {
             int currentWeapon = 0;
             int movesLeft = MOVES_PER_TURN;
 
-            int aiDifficulty = 0;
             Vector2 lastHit;
             bool hasLastHit = false;
 
             static std::shared_ptr<TankController> create();
-
 
             std::vector<std::pair<std::shared_ptr<Weapon>, int>> weapons;
             void addWeapon(std::shared_ptr<Weapon> weapon, int amount);
@@ -286,7 +479,16 @@ namespace Hilltop {
         };
 
 
-        class LastHitTracer final : public Tracer {
+        class LastHitTracer : public Tracer {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            friend inline void load_construct_data(Archive &ar, LastHitTracer *t, const unsigned int);
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Tracer>(*this);
+            }
+
         protected:
             LastHitTracer(TankController &player);
 
@@ -299,9 +501,37 @@ namespace Hilltop {
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
         };
 
+        template<class Archive>
+        inline void save_construct_data(Archive &ar, const LastHitTracer *t, const unsigned int) {
+            ar << t->player;
+        }
+
+        template<class Archive>
+        inline void load_construct_data(Archive &ar, LastHitTracer *t, const unsigned int) {
+            std::shared_ptr<TankController> player;
+            ar >> player;
+            ::new(t) LastHitTracer(*player);
+        }
+
 
 
         class TankMatch {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & map;
+                ar & entities;
+                ar & entityChanges;
+                ar & recentUpdateResult;
+                ar & players;
+                ar & currentPlayer;
+                ar & gravity;
+                ar & tickNumber;
+                ar & isAiming;
+                ar & firingMode;
+            }
+
         public:
             enum LandType : unsigned char {
                 AIR = 0,
@@ -371,5 +601,19 @@ namespace Hilltop {
 
             int getNextPlayer();
         };
+
+        template<class Archive>
+        inline void save_construct_data(Archive &ar, const TankMatch *t, const unsigned int) {
+            ar << t->width;
+            ar << t->height;
+        }
+
+        template<class Archive>
+        inline void load_construct_data(Archive &ar, TankMatch *t, const unsigned int) {
+            unsigned short width, height;
+            ar >> width;
+            ar >> height;
+            ::new(t) TankMatch(width, height);
+        }
     }
 }

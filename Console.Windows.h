@@ -6,7 +6,7 @@
 namespace Hilltop {
     namespace Console {
 
-        class WindowsConsole final : public BufferedNativeConsole {
+        class WindowsConsole : public BufferedNativeConsole {
         private:
             std::vector<CHAR_INFO> buffer = std::vector<CHAR_INFO>(width * height);
             unsigned short chosenSize = 0;
