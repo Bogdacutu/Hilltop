@@ -210,6 +210,7 @@ bool Hilltop::UI::Form::doAction(bool focused) {
     event_args_t args(this);
 
     args.type = focused ? FOCUS : BLUR;
+    args.position = currentPos;
 
     if (actions[currentPos])
         return actions[currentPos](args);
@@ -357,5 +358,21 @@ void Hilltop::UI::Form::configureSimpleForm(Form &form) {
             form.mapping[i].left = form.mapping[i].top = i - 1;
         if (i < form.elements.size() - 1)
             form.mapping[i].right = form.mapping[i].bottom = i + 1;
+    }
+}
+
+void Hilltop::UI::Form::configureMatrixForm(Form &form, int lines, int cols) {
+    for (int i = 0; i < lines; i++) {
+        const unsigned int idx = i * cols;
+        if (i > 0)
+            for (int j = 0; j < cols; j++)
+                form.mapping[idx + j].top = idx + j - cols;
+        if (i < lines - 1)
+            for (int j = 0; j < cols; j++)
+                form.mapping[idx + j].bottom = idx + j + cols;
+        for (int j = 1; j < cols; j++)
+            form.mapping[idx + j].left = idx + j - 1;
+        for (int j = 0; j < cols - 1; j++)
+            form.mapping[idx + j].right = idx + j + 1;
     }
 }

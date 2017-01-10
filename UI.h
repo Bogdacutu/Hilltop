@@ -55,7 +55,7 @@ namespace Hilltop {
             std::string text;
             Console::TextAlignment alignment = Console::TextAlignment::LEFT;
             Console::ConsoleColor color = Console::ConsoleColor::WHITE;
-            bool wordWrap = true;
+            bool wordWrap = false;
 
             static std::shared_ptr<TextBox> create();
         };
@@ -154,6 +154,7 @@ namespace Hilltop {
             void draw(Console::BufferedConsole &console, ElementCollection &elements);
 
             static void configureSimpleForm(Form &form);
+            static void configureMatrixForm(Form &form, int lines, int cols);
         };
     }
 }

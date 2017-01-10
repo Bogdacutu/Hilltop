@@ -70,7 +70,7 @@ void Hilltop::Console::BufferedConsole::set(unsigned short x, unsigned short y, 
 Hilltop::Console::BufferedNativeConsole::BufferedNativeConsole(unsigned short width, unsigned short height)
     : BufferedConsole(width, height) {}
 
-void Hilltop::Console::BufferedNativeConsole::configure() const {}
+void Hilltop::Console::BufferedNativeConsole::configure() {}
 
 
 

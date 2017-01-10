@@ -9,6 +9,7 @@ namespace Hilltop {
         class WindowsConsole final : public BufferedNativeConsole {
         private:
             std::vector<CHAR_INFO> buffer = std::vector<CHAR_INFO>(width * height);
+            unsigned short chosenSize = 0;
 
         protected:
             WindowsConsole(HANDLE handle, unsigned short width, unsigned short height, unsigned short minFont,
@@ -18,7 +19,7 @@ namespace Hilltop {
             const HANDLE handle;
             const unsigned short minFont, maxFont;
 
-            virtual void configure() const override;
+            virtual void configure() override;
 
             static std::shared_ptr<WindowsConsole> create(HANDLE handle, unsigned short width,
                 unsigned short height, unsigned short minFont = 6, unsigned short maxFont = 36);

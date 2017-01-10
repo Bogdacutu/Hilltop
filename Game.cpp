@@ -533,6 +533,17 @@ std::shared_ptr<TankController> Hilltop::Game::TankController::create() {
     return std::shared_ptr<TankController>(new TankController());
 }
 
+void Hilltop::Game::TankController::addWeapon(std::shared_ptr<Weapon> weapon, int amount) {
+    for (int i = 0; i < weapons.size(); i++) {
+        if (weapons[i].first == weapon) {
+            weapons[i].second += amount;
+            return;
+        }
+    }
+
+    weapons.push_back(std::make_pair(weapon, amount));
+}
+
 void Hilltop::Game::TankController::applyAI(TankController &player) {}
 
 

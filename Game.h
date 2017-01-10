@@ -269,7 +269,6 @@ namespace Hilltop {
             std::shared_ptr<Tank> tank;
             int team = 1;
             bool isHuman = true;
-            std::vector<std::pair<std::shared_ptr<Weapon>, int>> weapons;
             int currentWeapon = 0;
             int movesLeft = MOVES_PER_TURN;
 
@@ -278,6 +277,10 @@ namespace Hilltop {
             bool hasLastHit = false;
 
             static std::shared_ptr<TankController> create();
+
+
+            std::vector<std::pair<std::shared_ptr<Weapon>, int>> weapons;
+            void addWeapon(std::shared_ptr<Weapon> weapon, int amount);
 
             static void applyAI(TankController &player);
         };

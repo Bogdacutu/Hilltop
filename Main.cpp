@@ -24,6 +24,9 @@ const unsigned short MENU_HEIGHT = 25;
 std::shared_ptr<BufferedConsole> console;
 
 
+const int START_WEAPONS = 10;
+
+
 std::shared_ptr<ElementCollection> bottomArea;
 
 std::shared_ptr<ElementCollection> weaponArea;
@@ -47,7 +50,13 @@ std::shared_ptr<TankMatch> match;
 std::shared_ptr<Form> gameForm;
 bool exitMatch = false;
 
-enum {
+
+std::shared_ptr<TextBox> playerText[4];
+std::shared_ptr<TextBox> playerType[4];
+std::shared_ptr<TextBox> playerTeam[4];
+std::shared_ptr<TextBox> playerTank[4];
+
+enum GameControlArea {
     WEAPON_AREA,
     MOVE_AREA,
     FIRE_BUTTON_TOP,
@@ -55,7 +64,7 @@ enum {
     ANGLE_AREA,
     POWER_AREA,
     NUM_GAME_CONTROL_AREAS
-} GameControlArea;
+};
 
 static void preventResizeWindow() {
     HWND window = GetConsoleWindow();
@@ -116,14 +125,14 @@ static void callWithConsoleSnapshot(std::function<void()> func) {
     });
 }
 
-enum {
+enum PauseScreenArea {
     PAUSED_RESUME_OPTION,
     PAUSED_LOAD_GAME_OPTION,
     PAUSED_SAVE_GAME_OPTION,
     PAUSED_QUIT_TO_MENU_OPTION,
     PAUSED_EXIT_GAME_OPTION,
     NUM_PAUSED_AREAS
-} PauseScreenArea;
+};
 
 static void drawPauseHeader(Element &pauseArea) {
     std::shared_ptr<BufferedConsoleRegion> sub = BufferedConsoleRegion::create(*console,
@@ -767,10 +776,12 @@ static void gameLoop() {
             if (gameForm->currentPos == WEAPON_AREA && gameForm->isFocused)
                 drawWeaponList();
         } else if (!match->recentUpdatesMattered()) {
-            std::shared_ptr<TankController> player = match->players[match->currentPlayer];
-            if (player->weapons[player->currentWeapon].second <= 0) {
-                player->weapons.erase(player->weapons.begin() + player->currentWeapon);
-                player->currentWeapon = 0;
+            for (int i = 0; i < match->players.size(); i++) {
+                std::shared_ptr<TankController> player = match->players[i];
+                if (player->weapons[player->currentWeapon].second <= 0) {
+                    player->weapons.erase(player->weapons.begin() + player->currentWeapon);
+                    player->currentWeapon = 0;
+                }
             }
 
             match->currentPlayer = match->getNextPlayer();
@@ -828,13 +839,276 @@ static void drawMainMenuBackground(BufferedConsole &console) {
     buffer.commit(console);
 }
 
-enum {
+enum NewGameArea {
+    TANK_TYPE_OPTION = 0,
+    TANK_TEAM_OPTION,
+    TANK_CUSTOMIZE_OPTION,
+    NUM_PLAYER_NEW_GAME_AREAS,
+    GAME_OPTIONS_LEFT = TANK_TYPE_OPTION + NUM_PLAYER_NEW_GAME_AREAS * 4,
+    GAME_OPTIONS_RIGHT,
+    START_GAME_OPTION,
+    NUM_NEW_GAME_AREAS
+};
+
+enum PlayerTeam {
+    TEAM_BLUE = 1,
+    TEAM_GREEN = 2,
+    TEAM_RED = 3,
+    TEAM_YELLOW = 4,
+};
+
+struct {
+    struct {
+        bool enabled = false;
+        bool human = false;
+        int team;
+        struct {
+
+        } tank[4];
+    } players[4];
+} newGameSettings;
+
+bool exitNewGame = false;
+
+static bool newGameValid() {
+    return true;
+}
+
+static void updateNewGameMenu() {
+    for (int i = 0; i < 4; i++) {
+        std::string type = "Empty";
+        ConsoleColor color = BLACK;
+        if (newGameSettings.players[i].enabled) {
+            color = WHITE;
+            type = newGameSettings.players[i].human ? "Human" : "Bot";
+        }
+
+        playerText[i]->color = newGameSettings.players[i].enabled ? WHITE : GRAY;
+
+        playerType[i]->text = type;
+        playerType[i]->color = playerText[i]->color;
+        
+        std::string team;
+        switch (newGameSettings.players[i].team) {
+        case TEAM_BLUE:
+            team = "Blue";
+            break;
+        case TEAM_GREEN:
+            team = "Green";
+            break;
+        case TEAM_RED:
+            team = "Red";
+            break;
+        case TEAM_YELLOW:
+            team = "Yellow";
+            break;
+        }
+        playerTeam[i]->text = team;
+        playerTeam[i]->color = color;
+
+        playerTank[i]->color = color;
+    }
+}
+
+static bool startGameAction(Form::event_args_t e) {
+    if (newGameValid()) {
+        exitNewGame = true;
+
+        match = std::make_shared<TankMatch>(180, 90);
+        match->buildMap([](float x) { return 0.5f; });
+
+        for (int i = 0; i < 4; i++) {
+            if (newGameSettings.players[i].enabled) {
+                ConsoleColor color = BLACK;
+                switch (newGameSettings.players[i].team) {
+                case TEAM_BLUE:
+                    color = BLUE;
+                    break;
+                case TEAM_GREEN:
+                    color = GREEN;
+                    break;
+                case TEAM_RED:
+                    color = RED;
+                    break;
+                case TEAM_YELLOW:
+                    color = YELLOW;
+                    break;
+                }
+
+                std::shared_ptr<Tank> tank = Tank::create(color);
+                match->addEntity(*tank);
+
+                std::shared_ptr<TankController> controller = TankController::create();
+                controller->tank = tank;
+                controller->isHuman = newGameSettings.players[i].human;
+                match->players.push_back(controller);
+
+                for (int i = 0; i < START_WEAPONS; i++) {
+                    const int idx = scale(rand(), 0, RAND_MAX, 0, TankMatch::weapons.size());
+                    controller->addWeapon(TankMatch::weapons[idx], 1);
+                }
+            }
+        }
+
+        callWithNewConsole(gameLoop);
+    }
+
+    e.form->isFocused = false;
+    return true;
+}
+
+static void newGameMenu() {
+    std::shared_ptr<ElementCollection> newGameMenu = ElementCollection::create();
+    newGameMenu->width = MENU_WIDTH / 2 - 5;
+    newGameMenu->height = MENU_HEIGHT - 12;
+    newGameMenu->x = 10;
+    newGameMenu->y = 5;
+    newGameMenu->backgroundColor = DARK_BLUE;
+    newGameMenu->drawBackground = true;
+    
+    for (int i = 0; i < 4; i++) {
+        playerText[i] = TextBox::create();
+        playerText[i]->width = 9;
+        playerText[i]->height = 1;
+        playerText[i]->x = i * 2 + 1;
+        playerText[i]->y = 0;
+        std::ostringstream playerTextText;
+        playerTextText << "Player " << (i + 1) << ":";
+        playerText[i]->text = playerTextText.str();
+        newGameMenu->addChild(*playerText[i]);
+
+        playerType[i] = TextBox::create();
+        playerType[i]->width = 5;
+        playerType[i]->height = 1;
+        playerType[i]->x = i * 2 + 1;
+        playerType[i]->y = playerText[i]->y + playerText[i]->width + 5;
+        if (i == 0)
+            playerType[i]->text = "Human";
+        else if (i == 1)
+            playerType[i]->text = "Bot";
+        else
+            playerType[i]->text = "Empty";
+        if (i <= 1)
+            playerType[i]->color = WHITE;
+        else
+            playerType[i]->color = DARK_GRAY;
+        playerType[i]->alignment = CENTER;
+        newGameMenu->addChild(*playerType[i]);
+
+        playerTeam[i] = TextBox::create();
+        playerTeam[i]->width = 7;
+        playerTeam[i]->height = 1;
+        playerTeam[i]->x = i * 2 + 1;
+        playerTeam[i]->y = playerType[i]->y + playerType[i]->width + 5;
+        playerTeam[i]->text = "Green";
+        playerTeam[i]->alignment = CENTER;
+        newGameMenu->addChild(*playerTeam[i]);
+
+        playerTank[i] = TextBox::create();
+        playerTank[i]->width = 9;
+        playerTank[i]->height = 1;
+        playerTank[i]->x = i * 2 + 1;
+        playerTank[i]->y = playerTeam[i]->y + playerTeam[i]->width + 5;
+        playerTank[i]->text = "Customize";
+        newGameMenu->addChild(*playerTank[i]);
+    }
+
+    std::shared_ptr<TextBox> startGame = TextBox::create();
+    startGame->width = 10;
+    startGame->height = 1;
+    startGame->x = playerText[3]->x + 3;
+    startGame->y = newGameMenu->width - startGame->width;
+    startGame->text = "Start game";
+    startGame->color = WHITE;
+    newGameMenu->addChild(*startGame);
+
+    std::shared_ptr<TextBox> gameOptions = TextBox::create();
+    gameOptions->width = 12;
+    gameOptions->height = 1;
+    gameOptions->x = startGame->x;
+    gameOptions->y = startGame->y - gameOptions->width - 4;
+    gameOptions->text = "Game options";
+    gameOptions->color = WHITE;
+    newGameMenu->addChild(*gameOptions);
+
+    std::shared_ptr<Form> newGameForm = std::make_shared<Form>(NUM_NEW_GAME_AREAS);
+    for (int i = 0; i < 4; i++) {
+        newGameForm->elements[i * NUM_PLAYER_NEW_GAME_AREAS + TANK_TYPE_OPTION] = playerType[i];
+        newGameForm->elements[i * NUM_PLAYER_NEW_GAME_AREAS + TANK_TEAM_OPTION] = playerTeam[i];
+        newGameForm->elements[i * NUM_PLAYER_NEW_GAME_AREAS + TANK_CUSTOMIZE_OPTION] = playerTank[i];
+
+        newGameForm->actions[i * NUM_PLAYER_NEW_GAME_AREAS + TANK_TYPE_OPTION] = [](Form::event_args_t e)->bool {
+            const int idx = e.position / NUM_PLAYER_NEW_GAME_AREAS;
+            if (newGameSettings.players[idx].enabled) {
+                newGameSettings.players[idx].human = !newGameSettings.players[idx].human;
+                if (newGameSettings.players[idx].human)
+                    newGameSettings.players[idx].enabled = false;
+            } else {
+                newGameSettings.players[idx].enabled = true;
+                newGameSettings.players[idx].human = true;
+            }
+
+            e.form->isFocused = false;
+            return true;
+        };
+
+        newGameForm->actions[i * NUM_PLAYER_NEW_GAME_AREAS + TANK_TEAM_OPTION] = [](Form::event_args_t e)->bool {
+            const int idx = e.position / NUM_PLAYER_NEW_GAME_AREAS;
+            if (newGameSettings.players[idx].enabled)
+                newGameSettings.players[idx].team = newGameSettings.players[idx].team % 4 + 1;
+            
+            e.form->isFocused = false;
+            return true;
+        };
+
+        newGameForm->actions[i * NUM_PLAYER_NEW_GAME_AREAS + TANK_CUSTOMIZE_OPTION] = [](Form::event_args_t e)->bool {
+            // TODO: customize
+            
+            e.form->isFocused = false;
+            return true;
+        };
+    }
+    newGameForm->elements[GAME_OPTIONS_LEFT] = gameOptions;
+    newGameForm->elements[GAME_OPTIONS_RIGHT] = gameOptions;
+    newGameForm->elements[START_GAME_OPTION] = startGame;
+    Form::configureMatrixForm(*newGameForm, 5, NUM_PLAYER_NEW_GAME_AREAS);
+    newGameForm->mapping[GAME_OPTIONS_LEFT].right = START_GAME_OPTION;
+    newGameForm->actions[START_GAME_OPTION] = startGameAction;
+
+    tickLoop([&]() {
+        newGameForm->tick();
+    }, [&]()->bool {
+        if (exitNewGame) {
+            exitNewGame = false;
+            return false;
+        }
+
+        console->clear(BLACK);
+
+        updateNewGameMenu();
+
+        newGameMenu->draw(*console);
+        newGameForm->draw(*console, *newGameMenu);
+
+        console->commit();
+        return true;
+    });
+}
+
+enum MainMenuArea {
     NEW_GAME_OPTION,
     LOAD_GAME_OPTION,
     WEAPON_TEST_OPTION,
     EXIT_GAME_OPTION,
     NUM_MAIN_MENU_AREAS
-} MainMenuArea;
+};
+
+static bool newGameAction(Form::event_args_t e) {
+    callWithConsoleSnapshot(newGameMenu);
+
+    e.form->isFocused = false;
+    return true;
+}
 
 static bool weaponTestAction(Form::event_args_t e) {
     match = std::make_shared<TankMatch>(180, 90);
@@ -865,40 +1139,40 @@ static void mainMenu() {
     console = WindowsConsole::create(GetStdHandle(STD_OUTPUT_HANDLE), MENU_WIDTH, MENU_HEIGHT);
 
     std::shared_ptr<ElementCollection> mainMenu = ElementCollection::create();
-    mainMenu->x = 10;
-    mainMenu->y = 6;
     mainMenu->width = MENU_WIDTH / 2 - 12;
     mainMenu->height = MENU_HEIGHT - 12;
+    mainMenu->x = 10;
+    mainMenu->y = 6;
 
     std::shared_ptr<TextBox> newGameOption = TextBox::create();
-    newGameOption->x = 1;
-    newGameOption->y = 1;
     newGameOption->width = mainMenu->width - 2;
     newGameOption->height = 1;
+    newGameOption->x = 1;
+    newGameOption->y = 1;
     newGameOption->text = "> New Game";
     mainMenu->addChild(*newGameOption);
 
     std::shared_ptr<TextBox> loadGameOption = TextBox::create();
-    loadGameOption->x = 4;
-    loadGameOption->y = 1;
     loadGameOption->width = mainMenu->width - 2;
     loadGameOption->height = 1;
+    loadGameOption->x = 4;
+    loadGameOption->y = 1;
     loadGameOption->text = "> Load Game";
     mainMenu->addChild(*loadGameOption);
 
     std::shared_ptr<TextBox> weaponTestOption = TextBox::create();
-    weaponTestOption->x = 7;
-    weaponTestOption->y = 1;
     weaponTestOption->width = mainMenu->width - 2;
     weaponTestOption->height = 1;
+    weaponTestOption->x = 7;
+    weaponTestOption->y = 1;
     weaponTestOption->text = "> Weapon Test";
     mainMenu->addChild(*weaponTestOption);
 
     std::shared_ptr<TextBox> exitGameOption = TextBox::create();
-    exitGameOption->x = 10;
-    exitGameOption->y = 1;
     exitGameOption->width = mainMenu->width - 2;
     exitGameOption->height = 1;
+    exitGameOption->x = 10;
+    exitGameOption->y = 1;
     exitGameOption->text = "> Exit Game";
     mainMenu->addChild(*exitGameOption);
 
@@ -908,6 +1182,7 @@ static void mainMenu() {
     mainMenuForm->elements[WEAPON_TEST_OPTION] = weaponTestOption;
     mainMenuForm->elements[EXIT_GAME_OPTION] = exitGameOption;
     Form::configureSimpleForm(*mainMenuForm);
+    mainMenuForm->actions[NEW_GAME_OPTION] = newGameAction;
     mainMenuForm->actions[WEAPON_TEST_OPTION] = weaponTestAction;
     mainMenuForm->actions[EXIT_GAME_OPTION] = exitGameAction;
 
@@ -927,6 +1202,12 @@ int main() {
     srand(GetTickCount());
 
     TankMatch::initalizeWeapons();
+
+    newGameSettings.players[0].enabled = true;
+    newGameSettings.players[0].human = true;
+    newGameSettings.players[1].enabled = true;
+    for (int i = 0; i < 4; i++)
+        newGameSettings.players[i].team = i + 1;
 
     AttachConsole(-1);
     preventResizeWindow();

@@ -80,7 +80,7 @@ namespace Hilltop {
             BufferedNativeConsole(unsigned short width, unsigned short height);
 
         public:
-            virtual void configure() const;
+            virtual void configure();
         };
 
 
