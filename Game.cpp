@@ -720,6 +720,11 @@ void Hilltop::Game::TankMatch::arrangeTanks() {
         else
             players[i]->tank->angle = 45;
     }
+
+    // settle tanks
+    do {
+        tick();
+    } while (recentUpdatesMattered());
 }
 
 std::pair<bool, Vector2> Hilltop::Game::TankMatch::checkForHit(const Vector2 from, const Vector2 to,

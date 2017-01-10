@@ -1,6 +1,9 @@
 ﻿#include "Console.h"
 #include "Console.Windows.h"
 #include "UI.h"
+#include <boost/archive/iterators/base64_from_binary.hpp>
+#include <boost/archive/iterators/binary_from_base64.hpp>
+#include <boost/archive/iterators/transform_width.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/serialization/export.hpp>
@@ -70,12 +73,51 @@ std::shared_ptr<TextBox> powerText;
 std::shared_ptr<TankMatch> match;
 std::shared_ptr<Form> gameForm;
 bool exitMatch = false;
+bool reenterMatch = false;
 
 
 std::shared_ptr<TextBox> playerText[4];
 std::shared_ptr<TextBox> playerType[4];
 std::shared_ptr<TextBox> playerTeam[4];
 std::shared_ptr<TextBox> playerTank[4];
+std::shared_ptr<TextBox> newGameStartText;
+
+
+const wchar_t fileDialogFilter[] = L"Hilltop Map (*.htm)\0*.htm\0All Files\0*.*\0\0";
+wchar_t fileDialogBuffer[MAX_PATH] = {};
+std::wstring chosenFilename;
+
+
+static OPENFILENAME buildOpenFileName() {
+    OPENFILENAME open = { sizeof(OPENFILENAME) };
+    open.lpstrFile = fileDialogBuffer;
+    open.nMaxFile = sizeof(fileDialogBuffer) / sizeof(*fileDialogBuffer);
+    open.lpstrFilter = fileDialogFilter;
+    open.lpstrDefExt = L"htm";
+    return open;
+}
+
+static bool askLoadFile() {
+    OPENFILENAME open = buildOpenFileName();
+    open.Flags |= OFN_FILEMUSTEXIST;
+    if (GetOpenFileName(&open)) {
+        chosenFilename = fileDialogBuffer;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+static bool askSaveFile() {
+    OPENFILENAME open = buildOpenFileName();
+    open.Flags |= OFN_OVERWRITEPROMPT;
+    if (GetSaveFileName(&open)) {
+        chosenFilename = fileDialogBuffer;
+        return true;
+    } else {
+        return false;
+    }
+}
 
 enum GameControlArea {
     WEAPON_AREA,
@@ -146,16 +188,59 @@ static void callWithConsoleSnapshot(std::function<void()> func) {
     });
 }
 
-static void saveGame() {
-    std::ofstream fout("save.txt");
-    boost::archive::text_oarchive archive(fout);
-    archive << match;
+static void messageBox(std::string str, std::string title) {
+    MessageBoxA(nullptr, str.c_str(), title.c_str(), MB_OK);
 }
 
-static void loadGame() {
-    std::ifstream fin("save.txt");
-    boost::archive::text_iarchive archive(fin);
-    archive >> match;
+static void saveGame() {
+    static const std::string HTML = "<!doctype html><html><head><title>Hilltop Save File</title><style>body{text-align:center;font-family:Verdana,sans-serif;font-size:18pt}span{font-size:1pt;display:block;margin:0;padding:0}b,i{display:inline-block;width:10px;height:10px}b{background-color:#ce0000}a{font-size:11pt;position:relative;top:-4pt;color:blue}</style></head><body><br><br><span><b></b><i></i><i></i><i></i><i></i><i></i><i></i></span><span><i></i><b></b><i></i><i></i><i></i><i></i><i></i></span><span><i></i><i></i><b></b><i></i><i></i><i></i><i></i></span><span><i></i><b></b><b></b><b></b><b></b><b></b><i></i></span><span><b></b><b></b><b></b><b></b><b></b><b></b><b></b></span><br><br>This is a save file for the game Hilltop.<br>Load it to continue your match.<br><br>Hilltop is a tank artillery game.<br>Download Hilltop at:<br><a href='https://github.com/Bogdacutu/Hilltop'>https://github.com/Bogdacutu/Hilltop</a></body></html>";
+
+    using namespace boost::archive::iterators;
+    typedef base64_from_binary<transform_width<std::string::iterator, 6, 7>> base64_t;
+
+    if (!askSaveFile())
+        return;
+    std::ofstream fout(chosenFilename);
+    chosenFilename.clear();
+
+    std::ostringstream ss;
+    boost::archive::text_oarchive archive(ss);
+    archive << match;
+
+    fout << "<!-- ";
+    {
+        std::string data = ss.str();
+        std::copy(base64_t(data.begin()), base64_t(data.end()), std::ostream_iterator<char>(fout));
+        ss.clear();
+    }
+    fout << " -->" << std::endl;
+    fout << HTML << std::endl;
+}
+
+static bool loadGame() {
+    using namespace boost::archive::iterators;
+    typedef transform_width<binary_from_base64<std::string::iterator>, 7, 6> binary_t;
+    
+    if (!askLoadFile())
+        return false;
+    std::ifstream fin(chosenFilename);
+    chosenFilename.clear();
+
+    fin.ignore(8, ' ');
+    std::string str;
+    fin >> str;
+
+    try {
+        std::string decoded(binary_t(str.begin()), binary_t(str.end()));
+        std::istringstream ss(decoded);
+        boost::archive::text_iarchive archive(ss);
+        archive >> match;
+    } catch (std::exception &e) {
+        messageBox(e.what(), "Error while loading saved game");
+        return false;
+    }
+
+    return true;
 }
 
 enum PauseScreenArea {
@@ -267,8 +352,17 @@ static void pauseScreen() {
         return true;
     };
     form->actions[PAUSED_LOAD_GAME_OPTION] = [&stopPause](Form::event_args_t e)->bool {
-        loadGame();
-        stopPause = true;
+        unsigned short w, h;
+        w = match->width;
+        h = match->height;
+        if (loadGame()) {
+            if (match->width != w || match->height != h) {
+                exitMatch = true;
+                reenterMatch = true;
+            }
+            stopPause = true;
+        }
+        e.form->isFocused = false;
         return true;
     };
     form->actions[PAUSED_SAVE_GAME_OPTION] = [&stopPause](Form::event_args_t e)->bool {
@@ -288,7 +382,8 @@ static void pauseScreen() {
 
     tickLoop([&]() {
         form->tick(true, [&stopPause](Form::event_args_t e) {
-            stopPause = true;
+            if (e.type == Form::KEY && e.record.wVirtualKeyCode == VK_ESCAPE)
+                stopPause = true;
         });
     }, [&]()->bool {
         if (stopPause)
@@ -784,12 +879,6 @@ static void gameLoop() {
     gameForm->actions[ANGLE_AREA] = angleAreaAction;
     gameForm->actions[POWER_AREA] = powerAreaAction;
     gameForm->currentPos = FIRE_BUTTON_TOP;
-
-    // settle tanks
-    match->arrangeTanks();
-    do {
-        match->tick();
-    } while (match->recentUpdatesMattered());
     
     tickLoop([&]() {
         match->tick();
@@ -914,7 +1003,17 @@ struct {
 bool exitNewGame = false;
 
 static bool newGameValid() {
-    return true;
+    bool haveBot = false;
+    for (int i = 0; i < 4; i++) {
+        if (newGameSettings.players[i].enabled) {
+            if (newGameSettings.players[i].human || haveBot) {
+                return true;
+            } else {
+                haveBot = true;
+            }
+        }
+    }
+    return false;
 }
 
 static void updateNewGameMenu() {
@@ -951,6 +1050,15 @@ static void updateNewGameMenu() {
 
         playerTank[i]->color = color;
     }
+
+    newGameStartText->color = newGameValid() ? WHITE : BLACK;
+}
+
+static void runGameLoop() {
+    do {
+        reenterMatch = false;
+        callWithNewConsole(gameLoop);
+    } while (reenterMatch);
 }
 
 static bool startGameAction(Form::event_args_t e) {
@@ -993,7 +1101,11 @@ static bool startGameAction(Form::event_args_t e) {
             }
         }
 
-        callWithNewConsole(gameLoop);
+        match->isAiming = match->players[match->currentPlayer]->isHuman;
+
+        match->arrangeTanks();
+
+        runGameLoop();
     }
 
     e.form->isFocused = false;
@@ -1056,20 +1168,20 @@ static void newGameMenu() {
         newGameMenu->addChild(*playerTank[i]);
     }
 
-    std::shared_ptr<TextBox> startGame = TextBox::create();
-    startGame->width = 10;
-    startGame->height = 1;
-    startGame->x = playerText[3]->x + 3;
-    startGame->y = newGameMenu->width - startGame->width;
-    startGame->text = "Start game";
-    startGame->color = WHITE;
-    newGameMenu->addChild(*startGame);
+    newGameStartText = TextBox::create();
+    newGameStartText->width = 10;
+    newGameStartText->height = 1;
+    newGameStartText->x = playerText[3]->x + 3;
+    newGameStartText->y = newGameMenu->width - newGameStartText->width;
+    newGameStartText->text = "Start game";
+    newGameStartText->color = WHITE;
+    newGameMenu->addChild(*newGameStartText);
 
     std::shared_ptr<TextBox> gameOptions = TextBox::create();
     gameOptions->width = 12;
     gameOptions->height = 1;
-    gameOptions->x = startGame->x;
-    gameOptions->y = startGame->y - gameOptions->width - 4;
+    gameOptions->x = newGameStartText->x;
+    gameOptions->y = newGameStartText->y - gameOptions->width - 4;
     gameOptions->text = "Game options";
     gameOptions->color = WHITE;
     newGameMenu->addChild(*gameOptions);
@@ -1113,13 +1225,16 @@ static void newGameMenu() {
     }
     newGameForm->elements[GAME_OPTIONS_LEFT] = gameOptions;
     newGameForm->elements[GAME_OPTIONS_RIGHT] = gameOptions;
-    newGameForm->elements[START_GAME_OPTION] = startGame;
+    newGameForm->elements[START_GAME_OPTION] = newGameStartText;
     Form::configureMatrixForm(*newGameForm, 5, NUM_PLAYER_NEW_GAME_AREAS);
     newGameForm->mapping[GAME_OPTIONS_LEFT].right = START_GAME_OPTION;
     newGameForm->actions[START_GAME_OPTION] = startGameAction;
 
     tickLoop([&]() {
-        newGameForm->tick();
+        newGameForm->tick(true, [&](Form::event_args_t e) {
+            if (e.type == Form::KEY && e.record.wVirtualKeyCode == VK_ESCAPE)
+                exitNewGame = true;
+        });
     }, [&]()->bool {
         if (exitNewGame) {
             exitNewGame = false;
@@ -1153,6 +1268,14 @@ static bool newGameAction(Form::event_args_t e) {
     return true;
 }
 
+static bool loadGameAction(Form::event_args_t e) {
+    if (loadGame())
+        runGameLoop();
+
+    e.form->isFocused = false;
+    return true;
+}
+
 static bool weaponTestAction(Form::event_args_t e) {
     match = std::make_shared<TankMatch>(180, 90);
     match->buildMap([](float x) { return 0.5f; });
@@ -1167,7 +1290,9 @@ static bool weaponTestAction(Form::event_args_t e) {
     for (const std::shared_ptr<Weapon> &weapon : TankMatch::weapons)
         controller->weapons.push_back(std::make_pair(weapon, TankMatch::UNLIMITED_WEAPON_THRESHOLD));
 
-    callWithNewConsole(gameLoop);
+    match->arrangeTanks();
+
+    runGameLoop();
     
     e.form->isFocused = false;
     return true;
@@ -1226,6 +1351,7 @@ static void mainMenu() {
     mainMenuForm->elements[EXIT_GAME_OPTION] = exitGameOption;
     Form::configureSimpleForm(*mainMenuForm);
     mainMenuForm->actions[NEW_GAME_OPTION] = newGameAction;
+    mainMenuForm->actions[LOAD_GAME_OPTION] = loadGameAction;
     mainMenuForm->actions[WEAPON_TEST_OPTION] = weaponTestAction;
     mainMenuForm->actions[EXIT_GAME_OPTION] = exitGameAction;
 
@@ -1255,5 +1381,9 @@ int main() {
     AttachConsole(-1);
     preventResizeWindow();
 
-    mainMenu();
+    try {
+        mainMenu();
+    } catch (std::exception &e) {
+        messageBox(e.what(), "Fatal error!");
+    }
 }

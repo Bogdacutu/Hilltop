@@ -6,6 +6,12 @@ using namespace Hilltop::Console;
 
 
 
+static unsigned short getConsoleFontSize(HANDLE buffer) {
+    CONSOLE_FONT_INFOEX info = { sizeof(info) };
+    GetCurrentConsoleFontEx(buffer, FALSE, &info);
+    return info.dwFontSize.X;
+}
+
 static void setConsoleFontSize(HANDLE buffer, unsigned short size) {
     CONSOLE_FONT_INFOEX info = { sizeof(info) };
     GetCurrentConsoleFontEx(buffer, FALSE, &info);
@@ -30,25 +36,30 @@ static void getConsoleSize(HANDLE buffer, unsigned short *width, unsigned short 
     *height = info.srWindow.Bottom - info.srWindow.Top + 1;
 }
 
+static void centerWindow(HWND window) {
+    RECT pos;
+    GetWindowRect(window, &pos);
+    int width = pos.right - pos.left;
+    int height = pos.bottom - pos.top;
+    HMONITOR monitor = MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY);
+    MONITORINFO info = { sizeof(MONITORINFO) };
+    GetMonitorInfo(monitor, &info);
+    int monWidth = info.rcMonitor.right - info.rcMonitor.left;
+    SetWindowPos(window, HWND_TOP, (monWidth - width) / 2, 0, width, height, 0);
+}
+
+static void centerConsoleWindow() {
+    centerWindow(GetConsoleWindow());
+}
+
 static unsigned short resizeWithAutoFont(HANDLE buffer, unsigned short width, unsigned short height, unsigned short minFont, unsigned short maxFont) {
     unsigned short w = 0, h = 0;
     for (unsigned short i = maxFont; i >= minFont; i--) {
         setConsoleFontSize(buffer, i);
         setConsoleSize(buffer, width, height);
         getConsoleSize(buffer, &w, &h);
-        if (w == width && h == height) {
-            HWND window = GetConsoleWindow();
-            RECT pos;
-            GetWindowRect(window, &pos);
-            int width = pos.right - pos.left;
-            int height = pos.bottom - pos.top;
-            HMONITOR monitor = MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY);
-            MONITORINFO info = { sizeof(MONITORINFO) };
-            GetMonitorInfo(monitor, &info);
-            int monWidth = info.rcMonitor.right - info.rcMonitor.left;
-            SetWindowPos(window, HWND_TOP, (monWidth - width) / 2, 0, width, height, 0);
+        if (w == width && h == height)
             return i;
-        }
     }
     return minFont - 1;
 }
@@ -96,11 +107,15 @@ Hilltop::Console::WindowsConsole::WindowsConsole(HANDLE handle, unsigned short w
 }
 
 void Hilltop::Console::WindowsConsole::configure() {
-    setGameBufferProps(handle);
-    if (chosenSize)
-        resizeWithAutoFont(handle, width, height, chosenSize, chosenSize);
-    else
+    if (chosenSize > 0) {
+        if (getConsoleFontSize(handle) != chosenSize)
+            setConsoleFontSize(handle, chosenSize);
+        setConsoleSize(handle, width, height);
+    } else {
+        setGameBufferProps(handle);
         chosenSize = resizeWithAutoFont(handle, width, height, minFont, maxFont);
+    }
+    centerConsoleWindow();
 }
 
 std::shared_ptr<WindowsConsole> Hilltop::Console::WindowsConsole::create(HANDLE handle, unsigned short width,
