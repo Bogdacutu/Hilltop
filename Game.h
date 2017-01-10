@@ -315,7 +315,6 @@ namespace Hilltop {
             void serialize(Archive &ar, const unsigned int version) {
                 ar & boost::serialization::base_object<Entity>(*this);
                 ar & color;
-                ar & barrelColor;
                 ar & wheels;
                 ar & angle;
                 ar & power;
@@ -323,11 +322,10 @@ namespace Hilltop {
             }
 
         protected:
-            Tank(ConsoleColor color, ConsoleColor barrelColor);
+            Tank(ConsoleColor color);
 
         public:
             ConsoleColor color;
-            ConsoleColor barrelColor;
 
             std::shared_ptr<Entity> wheels[5];
 
@@ -341,9 +339,10 @@ namespace Hilltop {
 
             static Vector2 calcTrajectory(int angle, int power);
             Vector2 calcTrajectory();
+            std::vector<Vector2> getPixels();
+            bool testCollision(Vector2 position);
 
             static std::shared_ptr<Tank> create(ConsoleColor color);
-            static std::shared_ptr<Tank> create(ConsoleColor color, ConsoleColor barrelColor);
             void initWheels(TankMatch &match);
 
             virtual void onTick(TankMatch *match) override;
@@ -357,7 +356,7 @@ namespace Hilltop {
 
         template<class Archive>
         inline void load_construct_data(Archive &ar, Tank *t, const unsigned int) {
-            ::new(t) Tank(ConsoleColor(), ConsoleColor());
+            ::new(t) Tank(ConsoleColor());
         }
 
 
@@ -516,22 +515,6 @@ namespace Hilltop {
 
 
         class TankMatch {
-        private:
-            friend class boost::serialization::access;
-            template<class Archive>
-            void serialize(Archive &ar, const unsigned int version) {
-                ar & map;
-                ar & entities;
-                ar & entityChanges;
-                ar & recentUpdateResult;
-                ar & players;
-                ar & currentPlayer;
-                ar & gravity;
-                ar & tickNumber;
-                ar & isAiming;
-                ar & firingMode;
-            }
-
         public:
             enum LandType : unsigned char {
                 AIR = 0,
@@ -541,7 +524,62 @@ namespace Hilltop {
                 NUM_LAND_TYPES,
             };
 
-        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void save(Archive &ar, const unsigned int version) const {
+                ar & entities;
+                ar & entityChanges;
+                ar & recentUpdateResult;
+                ar & players;
+                ar & currentPlayer;
+                ar & gravity;
+                ar & tickNumber;
+                ar & isAiming;
+                ar & firingMode;
+                
+                if (map.size() > 0) {
+                    LandType lastType = map[0];
+                    size_t spanLength = 1;
+                    for (int i = 1; i < map.size(); i++) {
+                        LandType type = map[i];
+                        if (type != lastType) {
+                            ar & lastType;
+                            ar & spanLength;
+                            lastType = type;
+                            spanLength = 1;
+                        } else {
+                            spanLength++;
+                        }
+                    }
+                    ar & lastType;
+                    ar & spanLength;
+                }
+            }
+            template<class Archive>
+            void load(Archive &ar, const unsigned int version) {
+                ar & entities;
+                ar & entityChanges;
+                ar & recentUpdateResult;
+                ar & players;
+                ar & currentPlayer;
+                ar & gravity;
+                ar & tickNumber;
+                ar & isAiming;
+                ar & firingMode;
+
+                LandType type;
+                size_t spanLength = 0;
+                for (int i = 0; i < map.size(); i++) {
+                    if (spanLength == 0) {
+                        ar & type;
+                        ar & spanLength;
+                    }
+                    map[i] = type;
+                    spanLength--;
+                }
+            }
+            BOOST_SERIALIZATION_SPLIT_MEMBER()
+
             std::vector<LandType> map;
 
             std::vector<std::shared_ptr<Entity>> entities;
@@ -551,6 +589,7 @@ namespace Hilltop {
             bool recentUpdateResult[10] = {};
 
             static const int AIM_RETICLE_TIME = 6;
+            static const int LAND_PHYSICS_EVERY_TICKS = 3;
 
             bool doEntityTick();
             bool doLandPhysics();
@@ -563,6 +602,9 @@ namespace Hilltop {
             };
 
             static const int UNLIMITED_WEAPON_THRESHOLD = 99;
+
+            static const int DEFAULT_MATCH_WIDTH = 180;
+            static const int DEFAULT_MATCH_HEIGHT = 90;
 
             const unsigned short width, height;
             Console::DoublePixelBufferedConsole canvas;
@@ -580,6 +622,7 @@ namespace Hilltop {
             static std::vector<std::shared_ptr<Weapon>> weapons;
             static void initalizeWeapons();
 
+            TankMatch();
             TankMatch(unsigned short width, unsigned short height);
 
             LandType get(int x, int y);

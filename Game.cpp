@@ -302,8 +302,7 @@ void Hilltop::Game::TankWheel::onDraw(TankMatch *match, Console::DoublePixelBuff
 // Tank
 //
 
-Hilltop::Game::Tank::Tank(ConsoleColor color, ConsoleColor barrelColor)
-    : Entity(), color(color), barrelColor(barrelColor) {
+Hilltop::Game::Tank::Tank(ConsoleColor color) : Entity(), color(color) {
     gravityMult = 0.0f;
 }
 
@@ -354,12 +353,43 @@ Vector2 Hilltop::Game::Tank::calcTrajectory() {
     return Tank::calcTrajectory(angle, power);
 }
 
-std::shared_ptr<Tank> Hilltop::Game::Tank::create(ConsoleColor color) {
-    return std::shared_ptr<Tank>(new Tank(color, color));
+std::vector<Vector2> Hilltop::Game::Tank::getPixels() {
+    std::vector<Vector2> pixels;
+
+    // the barrel
+    float a = angle * PI / 180.0f;
+    foreachPixel(getBarrelBase(), getBarrelEnd(), [&pixels](Vector2 v)->bool {
+        pixels.push_back(v);
+        return false;
+    });
+
+    // the rest of the tank
+    Vector2 p = position.round();
+    for (int i = 0; i < 5; i++)
+        pixels.push_back(p + Vector2(-1, i));
+    for (int i = 1; i < 4; i++)
+        pixels.push_back(p + Vector2(-2, i));
+
+    return pixels;
 }
 
-std::shared_ptr<Tank> Hilltop::Game::Tank::create(ConsoleColor color, ConsoleColor barrelColor) {
-    return std::shared_ptr<Tank>(new Tank(color, barrelColor));
+bool Hilltop::Game::Tank::testCollision(Vector2 position) {
+    position = position.round();
+    int x = position.X;
+    int y = position.Y;
+
+    for (Vector2 &v : getPixels()) {
+        int dx = v.X;
+        int dy = v.Y;
+        if (dx == x && dy == y)
+            return true;
+    }
+
+    return false;
+}
+
+std::shared_ptr<Tank> Hilltop::Game::Tank::create(ConsoleColor color) {
+    return std::shared_ptr<Tank>(new Tank(color));
 }
 
 void Hilltop::Game::Tank::initWheels(TankMatch &match) {
@@ -395,21 +425,10 @@ void Hilltop::Game::Tank::onDraw(TankMatch *match, Console::DoublePixelBufferedC
 
     Entity::onDraw(match, console);
 
+    for (Vector2 &v : getPixels())
+        console.set(v.X, v.Y, color);
+
     Vector2 p = position.round();
-    
-    // draw barrel
-    float a = angle * pi / 180.0f;
-    foreachPixel(getBarrelBase(), getBarrelEnd(), [this, &console](Vector2 v)->bool {
-        console.set(v.X, v.Y, barrelColor);
-        return false;
-    });
-
-    // draw the rest of the tank
-    for (int i = 0; i < 5; i++)
-        console.set(p.X - 1, p.Y + i, color);
-    for (int i = 1; i < 4; i++)
-        console.set(p.X - 2, p.Y + i, color);
-
     for (int i = 0; i < 9; i++)
         console.set(p.X + 2, p.Y - 2 + i, health > i * 11 ? GREEN : RED);
 }
@@ -688,6 +707,8 @@ void Hilltop::Game::TankMatch::set(int x, int y, LandType type) {
     map[x * width + y] = type;
 }
 
+Hilltop::Game::TankMatch::TankMatch() : TankMatch(DEFAULT_MATCH_WIDTH, DEFAULT_MATCH_HEIGHT) {}
+
 Hilltop::Game::TankMatch::TankMatch(unsigned short width, unsigned short height)
     : width(width), height(height), map(width * height), canvas(width, height) {}
 
@@ -768,7 +789,7 @@ void Hilltop::Game::TankMatch::tick() {
     tickNumber++;
     updateMattered = false;
 
-    if (tickNumber % 3 == 0)
+    if (tickNumber % LAND_PHYSICS_EVERY_TICKS == 0)
         updateMattered |= doLandPhysics();
     
     updateMattered |= doEntityTick();

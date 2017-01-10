@@ -16,6 +16,7 @@
 #include <Windows.h>
 #undef min
 #undef max
+#define VK_A 0x41
 
 
 #include "Game.h"
@@ -188,7 +189,7 @@ static void callWithConsoleSnapshot(std::function<void()> func) {
     });
 }
 
-static void messageBox(std::string str, std::string title) {
+static void messageBox(std::string str, std::string title = "") {
     MessageBoxA(nullptr, str.c_str(), title.c_str(), MB_OK);
 }
 
@@ -398,17 +399,6 @@ static void pauseScreen() {
         console->commit();
         return true;
     });
-}
-
-static bool gameGlobalAction(Form::event_args_t e) {
-    if (e.type == Form::KEY) {
-        if (e.record.wVirtualKeyCode == VK_ESCAPE) {
-            callWithConsoleSnapshot(pauseScreen);
-            return true;
-        }
-    }
-
-    return false;
 }
 
 static void buildGameUI(ElementCollection *bottomArea) {
@@ -776,9 +766,11 @@ static bool powerAreaAction(Form::event_args_t e) {
 
     switch (e.record.wVirtualKeyCode) {
     case VK_LEFT:
+    case VK_DOWN:
         delta = -DELTA_PER_TICK;
         break;
     case VK_RIGHT:
+    case VK_UP:
         delta = DELTA_PER_TICK;
         break;
     case VK_RETURN:
@@ -815,7 +807,7 @@ static bool fireButtonAction(Form::event_args_t e) {
 }
 
 static void fireButtonUpdate() {
-    ConsoleColor color = match->players[match->currentPlayer]->tank->barrelColor;
+    ConsoleColor color = match->players[match->currentPlayer]->tank->color;
     fireButton->backgroundColor = color;
     fireButton->color = is_bright_color(color) ? BLACK : WHITE;
 }
@@ -825,6 +817,30 @@ static void gameFormUpdate() {
     fireButtonUpdate();
     angleAreaUpdate();
     powerAreaUpdate();
+}
+
+static bool gameGlobalAction(Form::event_args_t e) {
+    if (e.type == Form::KEY) {
+        switch (e.record.wVirtualKeyCode) {
+        case VK_ESCAPE:
+            callWithConsoleSnapshot(pauseScreen);
+            return true;
+        case VK_A - 'A' + 'W':
+            e.record.wVirtualKeyCode = VK_UP;
+            return powerAreaAction(e);
+        case VK_A - 'A' + 'S':
+            e.record.wVirtualKeyCode = VK_DOWN;
+            return powerAreaAction(e);
+        case VK_A - 'A' + 'A':
+            e.record.wVirtualKeyCode = VK_LEFT;
+            return angleAreaAction(e);
+        case VK_A - 'A' + 'D':
+            e.record.wVirtualKeyCode = VK_RIGHT;
+            return angleAreaAction(e);
+        }
+    }
+
+    return false;
 }
 
 static void gameLoop() {
@@ -1065,7 +1081,7 @@ static bool startGameAction(Form::event_args_t e) {
     if (newGameValid()) {
         exitNewGame = true;
 
-        match = std::make_shared<TankMatch>(180, 90);
+        match = std::make_shared<TankMatch>();
         match->buildMap([](float x) { return 0.5f; });
 
         for (int i = 0; i < 4; i++) {
@@ -1277,7 +1293,7 @@ static bool loadGameAction(Form::event_args_t e) {
 }
 
 static bool weaponTestAction(Form::event_args_t e) {
-    match = std::make_shared<TankMatch>(180, 90);
+    match = std::make_shared<TankMatch>();
     match->buildMap([](float x) { return 0.5f; });
 
     std::shared_ptr<Tank> tank = Tank::create(RED);
