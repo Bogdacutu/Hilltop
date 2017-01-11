@@ -436,7 +436,7 @@ void Hilltop::Game::Tank::onDraw(TankMatch *match, Console::DoublePixelBufferedC
     if (hpTop >= match->height - 1)
         hpTop = p.X - 8;
 
-    int hp = scale(health, 0, 100, 0, 9);
+    int hp = scale(health, 0, maxHealth, 0, 9);
     for (int i = 0; i < 9; i++)
         console.set(hpTop, p.Y - 2 + i, RED);
     for (int i = 0; i < hp; i++)
@@ -883,19 +883,28 @@ void Hilltop::Game::TankMatch::fire() {
 
 int Hilltop::Game::TankMatch::getNextPlayer() {
     int currentTeam = players[currentPlayer]->team;
+    int minTeam = currentTeam;
+    int maxTeam = currentTeam;
     
+    for (int i = 0; i < players.size(); i++) {
+        int team = players[i]->team;
+        if (team < minTeam)
+            minTeam = team;
+        if (team > maxTeam)
+            maxTeam = team;
+    }
+
     for (int i = currentPlayer + 1; i < players.size(); i++)
         if (players[i]->team == currentTeam && players[i]->tank->alive)
             return i;
 
-    currentTeam++;
+    for (currentTeam++; currentTeam <= maxTeam; currentTeam++)
+        for (int i = 0; i < players.size(); i++)
+            if (players[i]->team == currentTeam && players[i]->tank->alive)
+                return i;
 
     for (int i = 0; i < players.size(); i++)
-        if (players[i]->team == currentTeam && players[i]->tank->alive)
-            return i;
-
-    for (int i = 0; i < players.size(); i++)
-        if (players[i]->team == 1 && players[i]->tank->alive)
+        if (players[i]->team == minTeam && players[i]->tank->alive)
             return i;
 
     return -1; // fallback

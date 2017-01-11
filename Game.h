@@ -319,9 +319,11 @@ namespace Hilltop {
                 ar & alive;
                 ar & angle;
                 ar & power;
+                ar & maxHealth;
                 ar & health;
                 ar & maxArmor;
                 ar & armor;
+                ar & damage;
             }
 
         protected:
@@ -335,9 +337,11 @@ namespace Hilltop {
             bool alive = true;
             int angle = 45;
             int power = 50;
+            int maxHealth = 100;
             int health = 100;
             int maxArmor = 0;
             int armor = 0;
+            float damage = 1.0f;
 
             Vector2 getBarrelBase();
             Vector2 getBarrelEnd();
@@ -457,6 +461,7 @@ namespace Hilltop {
                 ar & team;
                 ar & isHuman;
                 ar & currentWeapon;
+                ar & movesPerTurn;
                 ar & movesLeft;
                 ar & lastHit;
                 ar & hasLastHit;
@@ -467,13 +472,13 @@ namespace Hilltop {
             TankController();
 
         public:
-            static const int MOVES_PER_TURN = 25;
 
             std::shared_ptr<Tank> tank;
             int team = 1;
             bool isHuman = true;
             int currentWeapon = 0;
-            int movesLeft = MOVES_PER_TURN;
+            int movesPerTurn = 25;
+            int movesLeft = movesPerTurn;
 
             Vector2 lastHit;
             bool hasLastHit = false;

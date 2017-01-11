@@ -950,7 +950,8 @@ static void gameLoop() {
             int nextPlayer = match->getNextPlayer();
             if (nextPlayer >= 0) {
                 match->currentPlayer = nextPlayer;
-                match->players[match->currentPlayer]->movesLeft = TankController::MOVES_PER_TURN;
+                match->players[match->currentPlayer]->movesLeft =
+                    match->players[match->currentPlayer]->movesPerTurn;
                 if (match->players[match->currentPlayer]->isHuman) {
                     match->isAiming = true;
                 } else {
@@ -1035,7 +1036,7 @@ const char *PLAYER_TEAM_NAMES[] = {
 enum TankAttribute {
     TANK_HEALTH,
     TANK_STAMINA,
-    TANK_STRENGTH,
+    TANK_DAMAGE,
     TANK_ARMOR,
     NUM_TANK_ATTRIBUTES,
 };
@@ -1048,8 +1049,26 @@ const int TANK_ATTRIBUTE_SUM = NUM_TANK_ATTRIBUTES * DEFAULT_TANK_ATTRIBUTE_VALU
 const char *TANK_ATTRIBUTE_NAMES[] = {
     "Health",
     "Stamina",
-    "Strength",
+    "Damage",
     "Armor"
+};
+
+enum MapType {
+    MAP_FLAT,
+    MAP_HILLSIDE,
+    MAP_HILLTOP
+};
+
+const char *MAP_TYPE_NAMES[] = {
+    "Flat",
+    "Hillside",
+    "Hilltop"
+};
+
+const char *FIRING_MODE_NAMES[] = {
+    "Solo",
+    "Teams",
+    "Everyone"
 };
 
 struct {
@@ -1059,6 +1078,8 @@ struct {
         int team;
         int tank[NUM_TANK_ATTRIBUTES];
     } players[4];
+    MapType mapType = MAP_HILLTOP;
+    TankMatch::FiringMode firingMode = TankMatch::FIRE_AS_TEAM;
 } newGameSettings;
 
 int activeTankAttribute = 0;
@@ -1221,6 +1242,110 @@ static void customizeTankMenu(int index) {
     });
 }
 
+std::shared_ptr<TextBox> gameOptionLabels[2];
+std::shared_ptr<TextBox> gameOptionOptions[6];
+
+static void updateGameOptionMenu() {
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 3; j++) {
+            const int idx = i * 3 + j;
+            ConsoleColor color = DARK_GRAY;
+            if (i == 0) {
+                if (j == newGameSettings.mapType)
+                    color = WHITE;
+            } else {
+                if (j == newGameSettings.firingMode)
+                    color = WHITE;
+            }
+            gameOptionOptions[idx]->color = color;
+        }
+    }
+}
+
+static void gameOptionsMenu() {
+    std::shared_ptr<ElementCollection> gameOptions = ElementCollection::create();
+    gameOptions->width = MENU_WIDTH / 2 - 3;
+    gameOptions->height = MENU_HEIGHT - 12;
+    gameOptions->x = 10;
+    gameOptions->y = 5;
+    gameOptions->backgroundColor = DARK_BLUE;
+    gameOptions->drawBackground = true;
+
+    for (int i = 0; i < 2; i++) {
+        gameOptionLabels[i] = TextBox::create();
+        gameOptionLabels[i]->width = 12;
+        gameOptionLabels[i]->height = 1;
+        gameOptionLabels[i]->x = 3 + i * 3;
+        gameOptionLabels[i]->y = 0;
+        gameOptionLabels[i]->color = GRAY;
+        gameOptionLabels[i]->alignment = RIGHT;
+        if (i == 0)
+            gameOptionLabels[i]->text = "Map Type";
+        else
+            gameOptionLabels[i]->text = "Firing Mode";
+        gameOptionLabels[i]->text += ":";
+        gameOptions->addChild(*gameOptionLabels[i]);
+
+        for (int j = 0; j < 3; j++) {
+            const int idx = i * 3 + j;
+            gameOptionOptions[idx] = TextBox::create();
+            gameOptionOptions[idx]->width = 8;
+            gameOptionOptions[idx]->height = 1;
+            gameOptionOptions[idx]->x = 3 + i * 3;
+            gameOptionOptions[idx]->y = 16 + 11 * j;
+            gameOptionOptions[idx]->color = WHITE;
+            gameOptionOptions[idx]->alignment = CENTER;
+            if (i == 0)
+                gameOptionOptions[idx]->text = MAP_TYPE_NAMES[j];
+            else
+                gameOptionOptions[idx]->text = FIRING_MODE_NAMES[j];
+            gameOptions->addChild(*gameOptionOptions[idx]);
+        }
+    }
+
+    std::shared_ptr<Form> gameOptionsForm = std::make_shared<Form>(6);
+    for (int i = 0; i < 6; i++)
+        gameOptionsForm->elements[i] = gameOptionOptions[i];
+    Form::configureMatrixForm(*gameOptionsForm, 2, 3);
+    for (int i = 0; i < 6; i++) {
+        gameOptionsForm->actions[i] = [](Form::event_args_t e)->bool {
+            int row = e.position / 3;
+            int col = e.position % 3;
+
+            if (row == 0) {
+                newGameSettings.mapType = (MapType)col;
+            } else {
+                newGameSettings.firingMode = (TankMatch::FiringMode)col;
+            }
+
+            e.form->isFocused = false;
+            return true;
+        };
+    }
+
+    bool exitGameOptions = false;
+
+    tickLoop([&]() {
+        gameOptionsForm->tick(true, [&](Form::event_args_t e) {
+            if (e.type == Form::KEY && e.record.wVirtualKeyCode == VK_ESCAPE)
+                exitGameOptions = true;
+        });
+    }, [&]()->bool {
+        if (exitGameOptions)
+            return false;
+
+        console->clear(BLACK);
+
+        updateGameOptionMenu();
+
+        gameOptions->draw(*console);
+        gameOptionsForm->draw(*console, *gameOptions);
+        
+        console->commit();
+        return true;
+    });
+}
+
 static bool newGameValid() {
     bool haveBot = false;
     for (int i = 0; i < 4; i++) {
@@ -1270,7 +1395,26 @@ static bool startGameAction(Form::event_args_t e) {
         exitNewGame = true;
 
         match = std::make_shared<TankMatch>();
-        match->buildMap([](float x) { return 0.5f; });
+
+        std::function<float(float)> invert = [](float x)->float { return x; };
+        if (scale((float)rand(), 0, RAND_MAX, 0, 1) >= 0.5f)
+            invert = [](float x)->float { return 1.0f - x; };
+
+        switch (newGameSettings.mapType) {
+        case MAP_FLAT:
+            match->buildMap([](float x)->float { return 0.5f; });
+            break;
+        case MAP_HILLSIDE:
+            match->buildMap([invert](float x)->float {
+                return (std::sinf(invert(x) * 2 - 1.4f) + 1.0f) / 2.0f + 0.1f;
+            });
+            break;
+        case MAP_HILLTOP:
+            match->buildMap([invert](float x)->float {
+                return (std::sinf(invert(x) * 2) + 0.1f) / 1.5f + 0.1f;
+            });
+            break;
+        }
 
         for (int i = 0; i < 4; i++) {
             if (newGameSettings.players[i].enabled) {
@@ -1291,11 +1435,20 @@ static bool startGameAction(Form::event_args_t e) {
                 }
 
                 std::shared_ptr<Tank> tank = Tank::create(color);
+                tank->maxHealth = 60 + 10 * newGameSettings.players[i].tank[TANK_HEALTH];
+                tank->health = tank->maxHealth;
+                tank->damage = 0.6f + 0.1f * newGameSettings.players[i].tank[TANK_DAMAGE];
+                tank->maxArmor = scale((float)newGameSettings.players[i].tank[TANK_ARMOR],
+                    MIN_TANK_ATTRIBUTE_VALUE, MAX_TANK_ATTRIBUTE_VALUE, 0, 100);
+                tank->armor = tank->maxArmor;
                 match->addEntity(*tank);
 
                 std::shared_ptr<TankController> controller = TankController::create();
                 controller->tank = tank;
                 controller->isHuman = newGameSettings.players[i].human;
+                controller->team = newGameSettings.players[i].team;
+                controller->movesPerTurn = 5 + 5 * newGameSettings.players[i].tank[TANK_STAMINA];
+                controller->movesLeft = controller->movesPerTurn;
                 match->players.push_back(controller);
 
                 for (int i = 0; i < START_WEAPONS; i++) {
@@ -1306,6 +1459,8 @@ static bool startGameAction(Form::event_args_t e) {
         }
 
         match->isAiming = match->players[match->currentPlayer]->isHuman;
+
+        match->firingMode = newGameSettings.firingMode;
 
         match->arrangeTanks();
 
@@ -1421,9 +1576,12 @@ static void newGameMenu() {
         };
 
         newGameForm->actions[i * NUM_PLAYER_NEW_GAME_AREAS + TANK_CUSTOMIZE_OPTION] = [](Form::event_args_t e)->bool {
-            callWithConsoleSnapshot([e]() {
-                customizeTankMenu(e.position / NUM_PLAYER_NEW_GAME_AREAS);
-            });
+            const int idx = e.position / NUM_PLAYER_NEW_GAME_AREAS;
+            if (newGameSettings.players[idx].enabled) {
+                callWithConsoleSnapshot([idx]() {
+                    customizeTankMenu(idx);
+                });
+            }
 
             e.form->isFocused = false;
             return true;
@@ -1434,6 +1592,13 @@ static void newGameMenu() {
     newGameForm->elements[START_GAME_OPTION] = newGameStartText;
     Form::configureMatrixForm(*newGameForm, 5, NUM_PLAYER_NEW_GAME_AREAS);
     newGameForm->mapping[GAME_OPTIONS_LEFT].right = START_GAME_OPTION;
+    newGameForm->actions[GAME_OPTIONS_LEFT] = [](Form::event_args_t e)->bool {
+        callWithConsoleSnapshot(gameOptionsMenu);
+
+        e.form->isFocused = false;
+        return true;
+    };
+    newGameForm->actions[GAME_OPTIONS_RIGHT] = newGameForm->actions[GAME_OPTIONS_LEFT];
     newGameForm->actions[START_GAME_OPTION] = startGameAction;
 
     tickLoop([&]() {
