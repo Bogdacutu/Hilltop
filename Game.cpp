@@ -638,7 +638,36 @@ void Hilltop::Game::TankController::addWeapon(std::shared_ptr<Weapon> weapon, in
     weapons.push_back(std::make_pair(weapon, amount));
 }
 
-void Hilltop::Game::TankController::applyAI(TankController &player) {}
+void Hilltop::Game::TankController::applyAI(TankMatch *match, TankController &player) {
+    player.currentWeapon = scale(rand(), 0, RAND_MAX, 0, player.weapons.size() - 1);
+
+    std::shared_ptr<Tank> target;
+    for (int i = 0; i < match->players.size(); i++) {
+        std::shared_ptr<Tank> t = match->players[i]->tank;
+        if (t == player.tank || match->players[i]->team == player.team)
+            continue;
+        if (!target || distance(target->position, player.tank->position) <
+            distance(t->position, player.tank->position)) {
+            target = t;
+        }
+    }
+
+    if (target) {
+        int optimalAngle = scale(match->highestLand, 0, match->height, 80, 30);
+        if (target->position.Y < player.tank->position.Y)
+            optimalAngle = 180 - optimalAngle;
+        int angleDelta = optimalAngle - player.tank->angle;
+        int newAngle = player.tank->angle + angleDelta / 2;
+        player.tank->angle = std::max(0, std::min(180, newAngle));
+
+        if (player.hasLastHit) {
+            int powerDelta = std::abs(scale(target->position.Y - player.lastHit.Y, 0, 100, 0, 10) *
+                scale(match->highestLand, 0, match->height, 4, 1));
+            int newPower = player.tank->power + powerDelta;
+            player.tank->power = std::max(0, std::min(100, newPower));
+        }
+    }
+}
 
 
 
@@ -660,11 +689,7 @@ void Hilltop::Game::LastHitTracer::onTick(TankMatch *match) {
 }
 
 void Hilltop::Game::LastHitTracer::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
-    Entity::onDraw(match, console);
-
-    Vector2 p = position.round();
-    if (!player->isHuman)
-        console.set(p.X, p.Y, RED);
+    return Entity::onDraw(match, console);
 }
 
 
@@ -864,13 +889,22 @@ std::pair<bool, Vector2> Hilltop::Game::TankMatch::checkForHit(const Vector2 fro
 }
 
 void Hilltop::Game::TankMatch::draw(Console::Console &console) {
+    lowestAir = 0;
+    highestLand = height - 1;
+
     canvas.clear(LAND_COLORS[AIR]);
 
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
             LandType land = get(i, j);
-            if (land != AIR)
+            if (land != AIR) {
                 canvas.set(i, j, LAND_COLORS[land]);
+                if (highestLand > i)
+                    highestLand = i;
+            } else {
+                if (lowestAir < i)
+                    lowestAir = i;
+            }
         }
     }
 

@@ -483,7 +483,6 @@ namespace Hilltop {
             TankController();
 
         public:
-
             std::shared_ptr<Tank> tank;
             int team = 1;
             bool isHuman = true;
@@ -499,7 +498,7 @@ namespace Hilltop {
             std::vector<std::pair<std::shared_ptr<Weapon>, int>> weapons;
             void addWeapon(std::shared_ptr<Weapon> weapon, int amount);
 
-            static void applyAI(TankController &player);
+            static void applyAI(TankMatch *match, TankController &player);
         };
 
 
@@ -645,6 +644,8 @@ namespace Hilltop {
             bool isAiming = true;
             bool gameOver = false;
             bool shownGameOver = false;
+            unsigned short lowestAir;
+            unsigned short highestLand;
 
             FiringMode firingMode = FIRE_AS_TEAM;
 

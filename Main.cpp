@@ -988,7 +988,7 @@ static void gameLoop() {
                 if (match->players[match->currentPlayer]->isHuman) {
                     match->isAiming = true;
                 } else {
-                    TankController::applyAI(*match->players[match->currentPlayer]);
+                    TankController::applyAI(match.get(), *match->players[match->currentPlayer]);
                     match->fire();
                 }
             } else {
