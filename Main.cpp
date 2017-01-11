@@ -897,8 +897,12 @@ static void gameLoop() {
     gameForm->currentPos = FIRE_BUTTON_TOP;
     
     tickLoop([&]() {
-        match->tick();
-        gameForm->tick(match->isAiming, gameGlobalAction);
+        if (!match->gameOver) {
+            match->tick();
+            gameForm->tick(match->isAiming, gameGlobalAction);
+        } else {
+            gameForm->tick(false, gameGlobalAction);
+        }
     }, [&]()->bool {
         if (exitMatch) {
             exitMatch = false;
@@ -910,6 +914,8 @@ static void gameLoop() {
         match->draw(*mainRegion);
 
         std::ostringstream tickCounterText;
+        if (match->gameOver)
+            tickCounterText << "Game over! - ";
         tickCounterText << "Tick " << match->tickNumber;
         tickCounter->text = tickCounterText.str();
         tickCounter->draw(*console);
@@ -923,7 +929,16 @@ static void gameLoop() {
             gameForm->draw(*console, *bottomArea);
             if (gameForm->currentPos == WEAPON_AREA && gameForm->isFocused)
                 drawWeaponList();
-        } else if (!match->recentUpdatesMattered()) {
+        }
+
+        console->commit();
+        
+        if (match->gameOver) {
+            if (!match->shownGameOver) {
+                messageBox("Game over!");
+                match->shownGameOver = true;
+            }
+        } else if (!match->isAiming && !match->recentUpdatesMattered()) {
             for (int i = 0; i < match->players.size(); i++) {
                 std::shared_ptr<TankController> player = match->players[i];
                 if (player->weapons[player->currentWeapon].second <= 0) {
@@ -932,17 +947,21 @@ static void gameLoop() {
                 }
             }
 
-            match->currentPlayer = match->getNextPlayer();
-            match->players[match->currentPlayer]->movesLeft = TankController::MOVES_PER_TURN;
-            if (match->players[match->currentPlayer]->isHuman) {
-                match->isAiming = true;
+            int nextPlayer = match->getNextPlayer();
+            if (nextPlayer >= 0) {
+                match->currentPlayer = nextPlayer;
+                match->players[match->currentPlayer]->movesLeft = TankController::MOVES_PER_TURN;
+                if (match->players[match->currentPlayer]->isHuman) {
+                    match->isAiming = true;
+                } else {
+                    TankController::applyAI(*match->players[match->currentPlayer]);
+                    match->fire();
+                }
             } else {
-                TankController::applyAI(*match->players[match->currentPlayer]);
-                match->fire();
+                match->gameOver = true;
             }
         }
 
-        console->commit();
         return true;
     });
 }

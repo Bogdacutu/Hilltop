@@ -128,6 +128,7 @@ namespace Hilltop {
             void serialize(Archive &ar, const unsigned int version) {
                 ar & boost::serialization::base_object<Entity>(*this);
                 ar & color;
+                ar & explosionSize;
                 ar & destroyLand;
                 ar & createLand;
             }
@@ -137,6 +138,8 @@ namespace Hilltop {
 
         public:
             ConsoleColor color;
+
+            int explosionSize = 5;
 
             bool destroyLand = true;
             bool createLand = false;
@@ -225,7 +228,7 @@ namespace Hilltop {
             }
 
         protected:
-            Explosion(int size, int damage);
+            Explosion(int size);
 
             static const int ticksBetween = 2;
 
@@ -235,12 +238,11 @@ namespace Hilltop {
         public:
             const int size;
             int coreSize;
-            const int damage;
 
             bool willDestroyLand = false;
             bool willCreateLand = false;
 
-            static std::shared_ptr<Explosion> create(int size, int damage);
+            static std::shared_ptr<Explosion> create(int size);
 
             virtual void onTick(TankMatch *match) override;
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
@@ -249,15 +251,13 @@ namespace Hilltop {
         template<class Archive>
         inline void save_construct_data(Archive &ar, const Explosion *t, const unsigned int) {
             ar << t->size;
-            ar << t->damage;
         }
 
         template<class Archive>
         void load_construct_data(Archive &ar, Explosion *t, const unsigned int) {
-            int size, damage;
+            int size;
             ar >> size;
-            ar >> damage;
-            ::new(t) Explosion(size, damage);
+            ::new(t) Explosion(size);
         }
 
 
@@ -316,9 +316,12 @@ namespace Hilltop {
                 ar & boost::serialization::base_object<Entity>(*this);
                 ar & color;
                 ar & wheels;
+                ar & alive;
                 ar & angle;
                 ar & power;
                 ar & health;
+                ar & maxArmor;
+                ar & armor;
             }
 
         protected:
@@ -329,9 +332,12 @@ namespace Hilltop {
 
             std::shared_ptr<Entity> wheels[5];
 
+            bool alive = true;
             int angle = 45;
             int power = 50;
             int health = 100;
+            int maxArmor = 0;
+            int armor = 0;
 
             Vector2 getBarrelBase();
             Vector2 getBarrelEnd();
@@ -352,6 +358,9 @@ namespace Hilltop {
 
             bool canMove(TankMatch *match, int direction);
             void doMove(TankMatch *match, int direction);
+
+            void dealDamage(TankMatch *match, int damage);
+            void die(TankMatch *match);
         };
 
         template<class Archive>
@@ -535,6 +544,7 @@ namespace Hilltop {
                 ar & gravity;
                 ar & tickNumber;
                 ar & isAiming;
+                ar & gameOver;
                 ar & firingMode;
                 
                 if (map.size() > 0) {
@@ -565,6 +575,7 @@ namespace Hilltop {
                 ar & gravity;
                 ar & tickNumber;
                 ar & isAiming;
+                ar & gameOver;
                 ar & firingMode;
 
                 LandType type;
@@ -616,8 +627,10 @@ namespace Hilltop {
             bool updateMattered = false;
             uint64_t tickNumber = 0;
             bool isAiming = true;
+            bool gameOver = false;
+            bool shownGameOver = false;
 
-            FiringMode firingMode = FIRE_EVERYTHING;
+            FiringMode firingMode = FIRE_AS_TEAM;
 
             static std::vector<std::shared_ptr<Weapon>> weapons;
             static void initalizeWeapons();

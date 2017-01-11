@@ -93,7 +93,7 @@ void Hilltop::Game::SimpleRocket::onHit(TankMatch *match) {
 
     match->removeEntity(*this);
 
-    std::shared_ptr<Explosion> ex = Explosion::create(8, 4);
+    std::shared_ptr<Explosion> ex = Explosion::create(explosionSize);
     ex->position = position;
     ex->willDestroyLand = destroyLand;
     ex->willCreateLand = createLand;
@@ -160,7 +160,7 @@ void Hilltop::Game::RocketTrail::onDraw(TankMatch *match, Console::DoublePixelBu
 // Explosion
 //
 
-Hilltop::Game::Explosion::Explosion(int size, int damage) : Entity(), size(size), damage(damage) {
+Hilltop::Game::Explosion::Explosion(int size) : Entity(), size(size) {
     gravityMult = 0.0f;
     coreSize = size - 1;
 }
@@ -182,8 +182,8 @@ void Hilltop::Game::Explosion::createLand(TankMatch *match) {
                     match->set(i, j, TankMatch::DIRT);
 }
 
-std::shared_ptr<Explosion> Hilltop::Game::Explosion::create(int size, int damage) {
-    return std::shared_ptr<Explosion>(new Explosion(size, damage));
+std::shared_ptr<Explosion> Hilltop::Game::Explosion::create(int size) {
+    return std::shared_ptr<Explosion>(new Explosion(size));
 }
 
 void Hilltop::Game::Explosion::onTick(TankMatch *match) {
@@ -425,12 +425,28 @@ void Hilltop::Game::Tank::onDraw(TankMatch *match, Console::DoublePixelBufferedC
 
     Entity::onDraw(match, console);
 
+    ConsoleColor c = alive ? color : DARK_GRAY;
+
     for (Vector2 &v : getPixels())
-        console.set(v.X, v.Y, color);
+        console.set(v.X, v.Y, c);
 
     Vector2 p = position.round();
+
+    int hpTop = p.X + 2;
+    if (hpTop >= match->height - 1)
+        hpTop = p.X - 8;
+
+    int hp = scale(health, 0, 100, 0, 9);
     for (int i = 0; i < 9; i++)
-        console.set(p.X + 2, p.Y - 2 + i, health > i * 11 ? GREEN : RED);
+        console.set(hpTop, p.Y - 2 + i, RED);
+    for (int i = 0; i < hp; i++)
+        console.set(hpTop, p.Y - 2 + i, GREEN);
+
+    if (maxArmor > 0) {
+        int ap = scale(armor, 0, maxArmor, 0, 9);
+        for (int i = 0; i < ap; i++)
+            console.set(hpTop + 1, p.Y - 2 + i, BLUE);
+    }
 }
 
 void Hilltop::Game::Tank::drawReticle(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
@@ -482,6 +498,36 @@ void Hilltop::Game::Tank::doMove(TankMatch *match, int direction) {
 
     if (ret)
         initWheels(*match);
+}
+
+void Hilltop::Game::Tank::dealDamage(TankMatch *match, int damage) {
+    if (armor > 0) {
+        armor = std::max(0, armor - damage);
+    } else {
+        health = std::max(0, health - damage);
+        if (health == 0)
+            die(match);
+    }
+}
+
+void Hilltop::Game::Tank::die(TankMatch *match) {
+    if (!alive)
+        return;
+    alive = false;
+
+    if (match) {
+        int angle = 75;
+        for (int i = 0; i < 2; i++) {
+            std::shared_ptr<SimpleRocket> rocket = SimpleRocket::create(WHITE);
+            rocket->position = position.round() + Vector2(-2, 2);
+            rocket->direction = calcTrajectory(angle, 10);
+            rocket->explosionSize = 4;
+            rocket->destroyLand = false;
+            match->addEntity(*rocket);
+
+            angle += 30;
+        }
+    }
 }
 
 
@@ -839,18 +885,18 @@ int Hilltop::Game::TankMatch::getNextPlayer() {
     int currentTeam = players[currentPlayer]->team;
     
     for (int i = currentPlayer + 1; i < players.size(); i++)
-        if (players[i]->team == currentTeam)
+        if (players[i]->team == currentTeam && players[i]->tank->alive)
             return i;
 
     currentTeam++;
 
     for (int i = 0; i < players.size(); i++)
-        if (players[i]->team == currentTeam)
+        if (players[i]->team == currentTeam && players[i]->tank->alive)
             return i;
 
     for (int i = 0; i < players.size(); i++)
-        if (players[i]->team == 1)
+        if (players[i]->team == 1 && players[i]->tank->alive)
             return i;
 
-    return 0; // fallback
+    return -1; // fallback
 }
