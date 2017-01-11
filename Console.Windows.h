@@ -6,6 +6,9 @@
 namespace Hilltop {
     namespace Console {
 
+        void initWindowsColors();
+        COLORREF mapWindowsColor(ConsoleColor color);
+
         class WindowsConsole : public BufferedNativeConsole {
         private:
             std::vector<CHAR_INFO> buffer = std::vector<CHAR_INFO>(width * height);

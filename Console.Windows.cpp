@@ -64,27 +64,14 @@ static unsigned short resizeWithAutoFont(HANDLE buffer, unsigned short width, un
     return minFont - 1;
 }
 
+
+COLORREF colors[16];
+
+
 static void setGameBufferProps(HANDLE buffer) {
     CONSOLE_SCREEN_BUFFER_INFOEX info = { sizeof(info) };
     GetConsoleScreenBufferInfoEx(buffer, &info);
-
-    // http://www.romanzolotarev.com/pico-8-color-palette/
-    info.ColorTable[BLACK] = RGB(0, 0, 0);
-    info.ColorTable[DARK_BLUE] = RGB(29, 43, 83);
-    info.ColorTable[PURPLE] = RGB(126, 37, 83);
-    info.ColorTable[DARK_GREEN] = RGB(0, 135, 81);
-    info.ColorTable[BROWN] = RGB(171, 82, 54);
-    info.ColorTable[DARK_GRAY] = RGB(95, 87, 79);
-    info.ColorTable[GRAY] = RGB(194, 195, 199);
-    info.ColorTable[WHITE] = RGB(255, 255, 255);
-    info.ColorTable[RED] = RGB(225, 0, 0);
-    info.ColorTable[ORANGE] = RGB(255, 163, 0);
-    info.ColorTable[YELLOW] = RGB(255, 236, 39);
-    info.ColorTable[GREEN] = RGB(0, 228, 54);
-    info.ColorTable[BLUE] = RGB(41, 173, 255);
-    info.ColorTable[INDIGO] = RGB(131, 118, 156);
-    info.ColorTable[PINK] = RGB(255, 119, 168);
-    info.ColorTable[PEACH] = RGB(255, 204, 170);
+    memcpy(info.ColorTable, colors, sizeof(colors));
 
     SetConsoleScreenBufferInfoEx(buffer, &info);
 
@@ -92,6 +79,31 @@ static void setGameBufferProps(HANDLE buffer) {
     cursorInfo.dwSize = 1;
     cursorInfo.bVisible = FALSE;
     SetConsoleCursorInfo(buffer, &cursorInfo);
+}
+
+
+void Hilltop::Console::initWindowsColors() {
+    // http://www.romanzolotarev.com/pico-8-color-palette/
+    colors[BLACK] = RGB(0, 0, 0);
+    colors[DARK_BLUE] = RGB(29, 43, 83);
+    colors[PURPLE] = RGB(126, 37, 83);
+    colors[DARK_GREEN] = RGB(0, 135, 81);
+    colors[BROWN] = RGB(171, 82, 54);
+    colors[DARK_GRAY] = RGB(95, 87, 79);
+    colors[GRAY] = RGB(194, 195, 199);
+    colors[WHITE] = RGB(255, 255, 255);
+    colors[RED] = RGB(225, 0, 0);
+    colors[ORANGE] = RGB(255, 163, 0);
+    colors[YELLOW] = RGB(255, 236, 39);
+    colors[GREEN] = RGB(0, 228, 54);
+    colors[BLUE] = RGB(41, 173, 255);
+    colors[INDIGO] = RGB(131, 118, 156);
+    colors[PINK] = RGB(255, 119, 168);
+    colors[PEACH] = RGB(255, 204, 170);
+}
+
+COLORREF Hilltop::Console::mapWindowsColor(ConsoleColor color) {
+    return colors[color];
 }
 
 

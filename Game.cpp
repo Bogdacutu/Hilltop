@@ -182,6 +182,30 @@ void Hilltop::Game::Explosion::createLand(TankMatch *match) {
                     match->set(i, j, TankMatch::DIRT);
 }
 
+int Hilltop::Game::Explosion::calcDamage(Vector2 point) {
+    return scale(distance(position.round(), point), 0, size, 4 * size, 1);
+}
+
+void Hilltop::Game::Explosion::hitTanks(TankMatch *match) {
+    Vector2 p = position.round();
+    typedef std::pair<std::shared_ptr<Tank>, Vector2> hit_t;
+    std::set<hit_t, std::function<bool(hit_t, hit_t)>> hits([p](hit_t x, hit_t y)->bool {
+        return distance(p, x.second) < distance(p, y.second);
+    });
+
+    for (int i = 0; i < match->players.size(); i++)
+        for (const Vector2 &v : match->players[i]->tank->getPixels())
+            if (distance(p, v) < size)
+                hits.insert(std::make_pair(match->players[i]->tank, v));
+
+    for (const hit_t &v : hits) {
+        if (tanksHit.find(v.first) == tanksHit.end()) {
+            tanksHit.insert(v.first);
+            v.first->dealDamage(match, calcDamage(v.second));
+        }
+    }
+}
+
 std::shared_ptr<Explosion> Hilltop::Game::Explosion::create(int size) {
     return std::shared_ptr<Explosion>(new Explosion(size));
 }
@@ -193,6 +217,7 @@ void Hilltop::Game::Explosion::onTick(TankMatch *match) {
         if (willDestroyLand) {
             willDestroyLand = false;
             destroyLand(match);
+            hitTanks(match);
         }
         if (willCreateLand) {
             willCreateLand = false;
@@ -304,6 +329,10 @@ void Hilltop::Game::TankWheel::onDraw(TankMatch *match, Console::DoublePixelBuff
 
 Hilltop::Game::Tank::Tank(ConsoleColor color) : Entity(), color(color) {
     gravityMult = 0.0f;
+}
+
+ConsoleColor Hilltop::Game::Tank::getActualColor() {
+    return alive ? color : DEAD_COLOR;
 }
 
 Vector2 Hilltop::Game::Tank::getBarrelBase() {
@@ -425,7 +454,7 @@ void Hilltop::Game::Tank::onDraw(TankMatch *match, Console::DoublePixelBufferedC
 
     Entity::onDraw(match, console);
 
-    ConsoleColor c = alive ? color : DARK_GRAY;
+    ConsoleColor c = getActualColor();
 
     for (Vector2 &v : getPixels())
         console.set(v.X, v.Y, c);
@@ -775,17 +804,43 @@ void Hilltop::Game::TankMatch::buildMap(std::function<float(float)> generator) {
 }
 
 void Hilltop::Game::TankMatch::arrangeTanks() {
+    typedef std::pair<int, int> team_t;
+    std::vector<team_t> teams;
+    for (int i = 0; i < players.size(); i++) {
+        bool found = false;
+        for (team_t &team : teams) {
+            if (players[i]->team == team.first) {
+                team.second++;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            teams.push_back(std::make_pair(players[i]->team, 1));
+        }
+    }
+    std::sort(teams.begin(), teams.end(), [](team_t x, team_t y)->bool {
+        return x.second > y.second;
+    });
+    if (scale(rand(), 0, RAND_MAX, 0, 1) >= 0.5f)
+        std::reverse(teams.begin(), teams.end());
+
     int leftBound = 10;
     int rightBound = width - 1 - 10 - 4;
-    for (int i = 0; i < players.size(); i++) {
-        int left = scale(i, 0, std::max(1, (int)players.size() - 1), leftBound, rightBound);
-        players[i]->tank->position = Vector2(-1, left);
-        players[i]->tank->initWheels(*this);
+    int index = 0;
+    for (int i = 0; i < teams.size(); i++) {
+        for (int j = 0; j < players.size(); j++) {
+            if (players[j]->team == teams[i].first) {
+                int left = scale(index++, 0, std::max(1, (int)players.size() - 1), leftBound, rightBound);
+                players[j]->tank->position = Vector2(-1, left);
+                players[j]->tank->initWheels(*this);
 
-        if (left > width / 2)
-            players[i]->tank->angle = 135;
-        else
-            players[i]->tank->angle = 45;
+                if (left > width / 2)
+                    players[j]->tank->angle = 135;
+                else
+                    players[j]->tank->angle = 45;
+            }
+        }
     }
 
     // settle tanks

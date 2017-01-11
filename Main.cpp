@@ -194,7 +194,11 @@ static void messageBox(std::string str, std::string title = "") {
 }
 
 static void saveGame() {
-    static const std::string HTML = "<!doctype html><html><head><title>Hilltop Save File</title><style>body{text-align:center;font-family:Verdana,sans-serif;font-size:18pt}span{font-size:1pt;display:block;margin:0;padding:0}b,i{display:inline-block;width:10px;height:10px}b{background-color:#ce0000}a{font-size:11pt;position:relative;top:-4pt;color:blue}</style></head><body><br><br><span><b></b><i></i><i></i><i></i><i></i><i></i><i></i></span><span><i></i><b></b><i></i><i></i><i></i><i></i><i></i></span><span><i></i><i></i><b></b><i></i><i></i><i></i><i></i></span><span><i></i><b></b><b></b><b></b><b></b><b></b><i></i></span><span><b></b><b></b><b></b><b></b><b></b><b></b><b></b></span><br><br>This is a save file for the game Hilltop.<br>Load it to continue your match.<br><br>Hilltop is a tank artillery game.<br>Download Hilltop at:<br><a href='https://github.com/Bogdacutu/Hilltop'>https://github.com/Bogdacutu/Hilltop</a></body></html>";
+    static const std::string HTML_BEGIN = "<html><head><title>Hilltop Save File</title><style>body{text-align:center;font-family:Verdana,sans-serif;font-size:18pt}div{margin:10px;display:inline-block}span{font-size:1pt;display:block;margin:0;padding:0}b,i{display:inline-block;width:10px;height:10px}i{background-color:white}a{font-size:11pt;position:relative;top:-4pt;color:blue}p{display:inline-block;width:16px}</style></head><body><br>";
+    static const std::string TANK_COMMON = "<span><i></i><b></b><b></b><b></b><b></b><b></b><i></i></span><span><b></b><b></b><b></b><b></b><b></b><b></b><b></b></span>";
+    static const std::string TANK_LEFT = "<span><b></b><i></i><i></i><i></i><i></i><i></i><i></i></span><span><i></i><b></b><i></i><i></i><i></i><i></i><i></i></span><span><i></i><i></i><b></b><i></i><i></i><i></i><i></i></span>" + TANK_COMMON;
+    static const std::string TANK_RIGHT = "<span><i></i><i></i><i></i><i></i><i></i><i></i><b></b></span><span><i></i><i></i><i></i><i></i><i></i><b></b><i></i></span><span><i></i><i></i><i></i><i></i><b></b><i></i><i></i></span>" + TANK_COMMON;
+    static const std::string HTML_END = "<br><br>This is a save file for Hilltop.<br>Load it to continue your match.<br><br>Hilltop is a tank artillery game.<br>Download Hilltop at:<br><a href='https://github.com/Bogdacutu/Hilltop'>https://github.com/Bogdacutu/Hilltop</a></body></html>";
 
     using namespace boost::archive::iterators;
     typedef base64_from_binary<transform_width<std::string::iterator, 6, 7>> base64_t;
@@ -208,14 +212,42 @@ static void saveGame() {
     boost::archive::text_oarchive archive(ss);
     archive << match;
 
-    fout << "<!-- ";
+    fout << "<!DOCTYPE html><!-- ";
     {
         std::string data = ss.str();
         std::copy(base64_t(data.begin()), base64_t(data.end()), std::ostream_iterator<char>(fout));
         ss.clear();
     }
-    fout << " -->" << std::endl;
-    fout << HTML << std::endl;
+    fout << " -->";
+    
+    std::vector<int> players;
+    for (int i = 0; i < match->players.size(); i++)
+        players.push_back(i);
+    std::sort(players.begin(), players.end(), [](int x, int y)->bool {
+        return match->players[x]->tank->position.Y < match->players[y]->tank->position.Y;
+    });
+
+    bool last_right = false;
+    fout << HTML_BEGIN;
+    for (int i = 0; i < players.size(); i++) {
+        std::shared_ptr<TankController> player = match->players[players[i]];
+
+        int angle = player->tank->angle;
+        bool right = angle < 90 || angle >= 270;
+        if (right != last_right && i > 0)
+            fout << "<p></p>";
+        last_right = right;
+
+        fout << "<div style='background-color:rgb(";
+        COLORREF color = mapWindowsColor(player->tank->getActualColor());
+        fout << (int)GetRValue(color) << "," << (int)GetGValue(color) << "," << (int)GetBValue(color);
+        fout << ")'>";
+
+        fout << (right ? TANK_RIGHT : TANK_LEFT);
+
+        fout << "</div>";
+    }
+    fout << HTML_END << std::endl;
 }
 
 static bool loadGame() {
@@ -227,7 +259,8 @@ static bool loadGame() {
     std::ifstream fin(chosenFilename);
     chosenFilename.clear();
 
-    fin.ignore(8, ' ');
+    fin.ignore(16, ' ');
+    fin.ignore(16, ' ');
     std::string str;
     fin >> str;
 
@@ -1438,8 +1471,8 @@ static bool startGameAction(Form::event_args_t e) {
                 tank->maxHealth = 60 + 10 * newGameSettings.players[i].tank[TANK_HEALTH];
                 tank->health = tank->maxHealth;
                 tank->damage = 0.6f + 0.1f * newGameSettings.players[i].tank[TANK_DAMAGE];
-                tank->maxArmor = scale((float)newGameSettings.players[i].tank[TANK_ARMOR],
-                    MIN_TANK_ATTRIBUTE_VALUE, MAX_TANK_ATTRIBUTE_VALUE, 0, 100);
+                tank->maxArmor = (int)scale((float)newGameSettings.players[i].tank[TANK_ARMOR],
+                    (float)MIN_TANK_ATTRIBUTE_VALUE, (float)MAX_TANK_ATTRIBUTE_VALUE, 0, 100);
                 tank->armor = tank->maxArmor;
                 match->addEntity(*tank);
 
@@ -1741,6 +1774,7 @@ static void mainMenu() {
 int main() {
     srand(GetTickCount());
 
+    initWindowsColors();
     TankMatch::initalizeWeapons();
 
     newGameSettings.players[0].enabled = true;

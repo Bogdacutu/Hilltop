@@ -5,12 +5,14 @@
 #include <boost/serialization/base_object.hpp>
 #include <boost/serialization/deque.hpp>
 #include <boost/serialization/queue.hpp>
+#include <boost/serialization/set.hpp>
 #include <boost/serialization/shared_ptr.hpp>
 #include <boost/serialization/utility.hpp>
 #include <boost/serialization/vector.hpp>
 #include <functional>
 #include <memory>
 #include <queue>
+#include <set>
 #include <vector>
 
 namespace Hilltop {
@@ -215,6 +217,7 @@ namespace Hilltop {
 
 
 
+        class Tank;
 
         class Explosion : public Entity {
         private:
@@ -225,6 +228,7 @@ namespace Hilltop {
             void serialize(Archive &ar, const unsigned int version) {
                 ar & boost::serialization::base_object<Entity>(*this);
                 ar & coreSize;
+                ar & tanksHit;
             }
 
         protected:
@@ -241,6 +245,10 @@ namespace Hilltop {
 
             bool willDestroyLand = false;
             bool willCreateLand = false;
+
+            std::set<std::shared_ptr<Tank>> tanksHit;
+            int calcDamage(Vector2 point);
+            void hitTanks(TankMatch *match);
 
             static std::shared_ptr<Explosion> create(int size);
 
@@ -330,7 +338,10 @@ namespace Hilltop {
             Tank(ConsoleColor color);
 
         public:
+            static const ConsoleColor DEAD_COLOR = ConsoleColor::DARK_GRAY;
+
             ConsoleColor color;
+            ConsoleColor getActualColor();
 
             std::shared_ptr<Entity> wheels[5];
 
