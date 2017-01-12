@@ -1,4 +1,4 @@
-#include "Game.h"
+﻿#include "Game.h"
 #include "Console.h"
 #include <algorithm>
 
@@ -59,6 +59,8 @@ void Hilltop::Game::Entity::onTick(TankMatch *match) {
 }
 
 void Hilltop::Game::Entity::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {}
+
+void Hilltop::Game::Entity::onDirectDraw(TankMatch *match, Console::BufferedConsole &console) {}
 
 void Hilltop::Game::Entity::onHit(TankMatch *match) {
     hasHit = true;
@@ -600,6 +602,116 @@ void Hilltop::Game::Tank::die(TankMatch *match) {
 
 
 //
+// Drop
+//
+
+Hilltop::Game::Drop::Drop() : Entity() {}
+
+int Hilltop::Game::Drop::getTopRow() {
+    Vector2 p = position.round();
+    return ((int)p.X / 2) * 2 - 4;
+}
+
+void Hilltop::Game::Drop::onTick(TankMatch *match) {
+    Entity::onTick(match);
+
+    int top = getTopRow();
+    int left = position.round().Y;
+
+    for (int i = 0; i < 6; i++) {
+        bool found = false;
+        for (const std::shared_ptr<TankController> &player : match->players) {
+            if (player->tank->alive && player->tank->testCollision(Vector2(top + i, left))) {
+                handleTank(match, *player->tank);
+                match->removeEntity(*this);
+                found = true;
+                break;
+            }
+        }
+        if (found)
+            break;
+    }
+}
+
+void Hilltop::Game::Drop::onDirectDraw(TankMatch *match, Console::BufferedConsole &console) {
+    Entity::onDirectDraw(match, console);
+
+    int top = getTopRow() / 2;
+    int left = position.round().Y;
+
+    console.set(top, left, L'▄', make_color(color, WHITE));
+    console.set(top + 1, left, ch, make_color(WHITE, color));
+    console.set(top + 2, left, L'▄', make_color(WHITE, color));
+}
+
+void Hilltop::Game::Drop::handleTank(TankMatch *match, Tank &tank) {}
+
+
+
+//
+// HealthDrop
+//
+
+Hilltop::Game::HealthDrop::HealthDrop() : Drop() {
+    color = RED;
+    ch = L'H';
+}
+
+std::shared_ptr<HealthDrop> Hilltop::Game::HealthDrop::create() {
+    return std::shared_ptr<HealthDrop>(new HealthDrop());
+}
+
+void Hilltop::Game::HealthDrop::handleTank(TankMatch *match, Tank &tank) {
+    tank.health = std::min(tank.maxHealth, tank.health + HEALTH);
+}
+
+
+
+//
+// ArmorDrop
+//
+
+Hilltop::Game::ArmorDrop::ArmorDrop() : Drop() {
+    color = BLUE;
+    ch = L'A';
+}
+
+std::shared_ptr<ArmorDrop> Hilltop::Game::ArmorDrop::create() {
+    return std::shared_ptr<ArmorDrop>(new ArmorDrop());
+}
+
+void Hilltop::Game::ArmorDrop::handleTank(TankMatch *match, Tank &tank) {
+    tank.armor = std::min(tank.maxArmor, tank.armor + ARMOR);
+}
+
+
+
+//
+// WeaponDrop
+//
+
+Hilltop::Game::WeaponDrop::WeaponDrop() : Drop() {
+    color = GREEN;
+    ch = L'W';
+}
+
+std::shared_ptr<WeaponDrop> Hilltop::Game::WeaponDrop::create() {
+    return std::shared_ptr<WeaponDrop>(new WeaponDrop());
+}
+
+void Hilltop::Game::WeaponDrop::handleTank(TankMatch *match, Tank &tank) {
+    for (const std::shared_ptr<TankController> &player : match->players) {
+        if (player->tank.get() == &tank) {
+            for (int i = 0; i < WEAPONS; i++)
+                player->addRandomWeapon();
+            break;
+        }
+    }
+}
+
+
+
+//
 // Weapon
 //
 
@@ -671,7 +783,7 @@ void Hilltop::Game::TankController::addWeapon(std::shared_ptr<Weapon> weapon, in
 }
 
 void Hilltop::Game::TankController::addRandomWeapon() {
-    const int idx = (int)scale((float)rand(), 0, RAND_MAX, 0, (float)TankMatch::weapons.size());
+    const int idx = rand() % TankMatch::weapons.size();
     addWeapon(TankMatch::weapons[idx], 1);
 }
 
@@ -754,7 +866,7 @@ bool Hilltop::Game::TankController::applyAI(TankMatch *match, TankController &pl
                 match->addEntity(*attempt);
             }
 
-            player.currentWeapon = scale(rand(), 0, RAND_MAX, 0, player.weapons.size() - 1);
+            player.currentWeapon = rand() % player.weapons.size();
 
             player.botStepsDone = 0;
             player.botLastStepTick = match->tickNumber;
@@ -782,7 +894,7 @@ bool Hilltop::Game::TankController::applyAI(TankMatch *match, TankController &pl
                     }
                     int idx = maxEq;
                     if (maxEq > 0)
-                        idx = scale(rand(), 0, RAND_MAX, 0, maxEq);
+                        idx = rand() % maxEq;
                     player.botTarget = players[idx]->tank->getBarrelBase();
                     player.botTargetTank = players[idx]->tank;
                 }
@@ -792,8 +904,8 @@ bool Hilltop::Game::TankController::applyAI(TankMatch *match, TankController &pl
                 player.botTarget = player.botTargetTank->getBarrelBase();
             } else {
                 player.botTarget = {
-                    scale(rand(), 0, RAND_MAX, 0, match->height - 1),
-                    scale(rand(), 0, RAND_MAX, 0, match->width - 1)
+                    (float)(rand() % match->height),
+                    (float)(rand() % match->width)
                 };
             }
         }
@@ -1032,7 +1144,25 @@ std::pair<bool, Vector2> Hilltop::Game::TankMatch::checkForHit(const Vector2 fro
     return ret;
 }
 
-void Hilltop::Game::TankMatch::draw(Console::Console &console) {
+void Hilltop::Game::TankMatch::doAirdrop() {
+    int val = rand() % 3;
+    std::shared_ptr<Drop> drop;
+    switch (val) {
+    case 0:
+        drop = HealthDrop::create();
+        break;
+    case 1:
+        drop = ArmorDrop::create();
+        break;
+    case 2:
+        drop = WeaponDrop::create();
+        break;
+    }
+    drop->position = { -10, (float)(rand() % width) };
+    addEntity(*drop);
+}
+
+void Hilltop::Game::TankMatch::draw(Console::BufferedConsole &console) {
     lowestAir = 0;
     highestLand = height - 1;
 
@@ -1062,11 +1192,18 @@ void Hilltop::Game::TankMatch::draw(Console::Console &console) {
     }
 
     canvas.commit(console);
+
+    for (const std::shared_ptr<Entity> &p : entities) {
+        p->onDirectDraw(this, console);
+    }
 }
 
 void Hilltop::Game::TankMatch::tick() {
     tickNumber++;
     updateMattered = false;
+
+    if (tickNumber % 100 == 99)
+        doAirdrop();
 
     if (tickNumber % LAND_PHYSICS_EVERY_TICKS == 0)
         updateMattered |= doLandPhysics();
@@ -1118,31 +1255,37 @@ int Hilltop::Game::TankMatch::getNextPlayer() {
     int currentTeam = players[currentPlayer]->team;
     int minTeam = currentTeam;
     int maxTeam = currentTeam;
+    int minAliveTeam = currentTeam;
+    int maxAliveTeam = currentTeam;
     
     for (int i = 0; i < players.size(); i++) {
-        if (!players[i]->tank->alive)
-            continue;
         int team = players[i]->team;
         if (team < minTeam)
             minTeam = team;
         if (team > maxTeam)
             maxTeam = team;
+        if (players[i]->tank->alive) {
+            if (team < minAliveTeam)
+                minAliveTeam = team;
+            if (team > maxAliveTeam)
+                maxAliveTeam = team;
+        }
     }
     
-    if (minTeam == maxTeam)
+    if (minAliveTeam == maxAliveTeam && minTeam != maxTeam)
         return -1;
 
     for (int i = currentPlayer + 1; i < players.size(); i++)
         if (players[i]->team == currentTeam && players[i]->tank->alive)
             return i;
 
-    for (currentTeam++; currentTeam <= maxTeam; currentTeam++)
+    for (currentTeam++; currentTeam <= maxAliveTeam; currentTeam++)
         for (int i = 0; i < players.size(); i++)
             if (players[i]->team == currentTeam && players[i]->tank->alive)
                 return i;
 
     for (int i = 0; i < players.size(); i++)
-        if (players[i]->team == minTeam && players[i]->tank->alive)
+        if (players[i]->team == minAliveTeam && players[i]->tank->alive)
             return i;
 
     return -1; // fallback

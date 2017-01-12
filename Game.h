@@ -120,6 +120,7 @@ namespace Hilltop {
 
             virtual void onTick(TankMatch *match);
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console);
+            virtual void onDirectDraw(TankMatch *match, Console::BufferedConsole &console);
             virtual void onHit(TankMatch *match);
             virtual void onExpire(TankMatch *match);
         };
@@ -418,6 +419,92 @@ namespace Hilltop {
         }
 
 
+        class Drop : public Entity {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Entity>(*this);
+                ar & color;
+                ar & ch;
+            }
+
+        protected:
+            Drop();
+
+        public:
+            ConsoleColor color = ConsoleColor::BLACK;
+            wchar_t ch = L' ';
+
+            int getTopRow();
+
+            virtual void onTick(TankMatch *match) override;
+            virtual void onDirectDraw(TankMatch *match, Console::BufferedConsole &console) override;
+
+            virtual void handleTank(TankMatch *match, Tank &tank);
+        };
+
+
+        class HealthDrop : public Drop {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Drop>(*this);
+            }
+
+        protected:
+            HealthDrop();
+
+        public:
+            static const int HEALTH = 50;
+
+            static std::shared_ptr<HealthDrop> create();
+
+            virtual void handleTank(TankMatch *match, Tank &tank) override;
+        };
+
+
+        class ArmorDrop : public Drop {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Drop>(*this);
+            }
+
+        protected:
+            ArmorDrop();
+
+        public:
+            static const int ARMOR = 25;
+
+            static std::shared_ptr<ArmorDrop> create();
+
+            virtual void handleTank(TankMatch *match, Tank &tank) override;
+        };
+
+
+        class WeaponDrop : public Drop {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Drop>(*this);
+            }
+
+        protected:
+            WeaponDrop();
+
+        public:
+            static const int WEAPONS = 10;
+
+            static std::shared_ptr<WeaponDrop> create();
+
+            virtual void handleTank(TankMatch *match, Tank &tank) override;
+        };
+
+
 
         class Weapon {
         private:
@@ -682,8 +769,9 @@ namespace Hilltop {
             void buildMap(std::function<float(float)> generator);
             void arrangeTanks();
             std::pair<bool, Vector2> checkForHit(const Vector2 from, const Vector2 to, bool groundHog = false);
-            
-            void draw(Console::Console &console);
+            void doAirdrop();
+
+            void draw(Console::BufferedConsole &console);
 
             void tick();
             bool recentUpdatesMattered();

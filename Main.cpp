@@ -30,6 +30,10 @@ BOOST_CLASS_EXPORT(Hilltop::Game::Explosion)
 BOOST_CLASS_EXPORT(Hilltop::Game::Tracer)
 BOOST_CLASS_EXPORT(Hilltop::Game::TankWheel)
 BOOST_CLASS_EXPORT(Hilltop::Game::Tank)
+BOOST_CLASS_EXPORT(Hilltop::Game::Drop)
+BOOST_CLASS_EXPORT(Hilltop::Game::HealthDrop)
+BOOST_CLASS_EXPORT(Hilltop::Game::ArmorDrop)
+BOOST_CLASS_EXPORT(Hilltop::Game::WeaponDrop)
 
 BOOST_CLASS_EXPORT(Hilltop::Game::Weapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::RocketWeapon)
@@ -195,7 +199,7 @@ void messageBox(std::string str, std::string title = "") {
 }
 
 static void saveGame() {
-    static const std::string HTML_BEGIN = "<html><head><title>Hilltop Save File</title><style>body{text-align:center;font-family:Verdana,sans-serif;font-size:18pt}div{margin:10px;display:inline-block}span{font-size:0;display:block;margin:0;padding:0}b,i{display:inline-block;width:10px;height:10px}i{background-color:white}a{font-size:11pt;position:relative;top:-4pt;color:blue}p{display:inline-block;width:16px}pre{color:#ccc;white-space:normal;word-wrap:break-word;max-width:600px;font-size:7pt;margin-left:auto;margin-right:auto;text-align:justify}</style></head><body onload='document.getElementsByTagName(\"pre\")[0].innerHTML=atob(document.childNodes[1].textContent.trim())'><br>";
+    static const std::string HTML_BEGIN = "<html><head><title>Hilltop Save File</title><style>body{text-align:center;font-family:Verdana,sans-serif;font-size:18pt}div{margin:20px;display:inline-block}span{font-size:0;display:block;margin:0;padding:0}b,i{display:inline-block;width:10px;height:10px}i{background-color:white}a{font-size:11pt;position:relative;top:-4pt;color:blue}pre{color:#ccc;white-space:normal;word-wrap:break-word;max-width:600px;font-size:7pt;margin-left:auto;margin-right:auto;text-align:justify}</style></head><body onload='document.getElementsByTagName(\"pre\")[0].innerHTML=atob(document.childNodes[1].textContent.trim())'><br>";
     static const std::string TANK_COMMON = "<span><i></i><b></b><b></b><b></b><b></b><b></b><i></i></span><span><b></b><b></b><b></b><b></b><b></b><b></b><b></b></span>";
     static const std::string TANK_LEFT = "<span><b></b><i></i><i></i><i></i><i></i><i></i><i></i></span><span><i></i><b></b><i></i><i></i><i></i><i></i><i></i></span><span><i></i><i></i><b></b><i></i><i></i><i></i><i></i></span>" + TANK_COMMON;
     static const std::string TANK_RIGHT = "<span><i></i><i></i><i></i><i></i><i></i><i></i><b></b></span><span><i></i><i></i><i></i><i></i><i></i><b></b><i></i></span><span><i></i><i></i><i></i><i></i><b></b><i></i><i></i></span>" + TANK_COMMON;
@@ -229,22 +233,17 @@ static void saveGame() {
         return match->players[x]->tank->position.Y < match->players[y]->tank->position.Y;
     });
 
-    bool last_right = false;
     fout << HTML_BEGIN;
     for (int i = 0; i < players.size(); i++) {
         std::shared_ptr<TankController> player = match->players[players[i]];
-
-        int angle = player->tank->angle;
-        bool right = angle < 90 || angle >= 270;
-        if (right != last_right && i > 0)
-            fout << "<p></p>";
-        last_right = right;
 
         fout << "<div style='background-color:rgb(";
         COLORREF color = mapWindowsColor(player->tank->getActualColor());
         fout << (int)GetRValue(color) << "," << (int)GetGValue(color) << "," << (int)GetBValue(color);
         fout << ")'>";
 
+        int angle = player->tank->angle;
+        bool right = angle < 90 || angle >= 270;
         fout << (right ? TANK_RIGHT : TANK_LEFT);
 
         fout << "</div>";
@@ -648,9 +647,10 @@ static void drawWeaponEntry(BufferedConsole &console, Weapon &weapon, int num, b
     printText(sub.get(), 0, 6, sub->width - 8, 1, weapon.name, textC);
 
     std::ostringstream numText;
-    numText << num;
-    if (num >= TankMatch::UNLIMITED_WEAPON_THRESHOLD)
-        numText << '+';
+    if (num < TankMatch::UNLIMITED_WEAPON_THRESHOLD)
+        numText << num;
+    else
+        numText << "99+";
 
     ConsoleColor numC = active ? DARK_GRAY : GRAY;
     printText(sub.get(), 0, 6, sub->width - 8, 1, numText.str(), numC, RIGHT);
