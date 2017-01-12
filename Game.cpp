@@ -208,7 +208,7 @@ void Hilltop::Game::Explosion::createLand(TankMatch *match) {
 }
 
 int Hilltop::Game::Explosion::calcDamage(Vector2 point) {
-    return scale(distance(position.round(), point), 0, size, 10 * size, 1);
+    return scale(distance(position.round(), point), 0, size, 8 * size, 1);
 }
 
 void Hilltop::Game::Explosion::hitTanks(TankMatch *match) {
@@ -501,16 +501,18 @@ void Hilltop::Game::Tank::onDraw(TankMatch *match, Console::DoublePixelBufferedC
     if (hpTop >= match->height - 1)
         hpTop = p.X - 8;
 
-    int hp = scale(health, 0, maxHealth, 0, 9);
-    for (int i = 0; i < 9; i++)
-        console.set(hpTop, p.Y - 2 + i, RED);
-    for (int i = 0; i < hp; i++)
-        console.set(hpTop, p.Y - 2 + i, GREEN);
+    if (alive) {
+        int hp = scale(health, 0, maxHealth, 0, 9);
+        for (int i = 0; i < 9; i++)
+            console.set(hpTop, p.Y - 2 + i, RED);
+        for (int i = 0; i < hp; i++)
+            console.set(hpTop, p.Y - 2 + i, GREEN);
 
-    if (maxArmor > 0) {
-        int ap = scale(armor, 0, maxArmor, 0, 9);
-        for (int i = 0; i < ap; i++)
-            console.set(hpTop + 1, p.Y - 2 + i, BLUE);
+        if (maxArmor > 0) {
+            int ap = scale(armor, 0, maxArmor, 0, 9);
+            for (int i = 0; i < ap; i++)
+                console.set(hpTop + 1, p.Y - 2 + i, BLUE);
+        }
     }
 }
 
@@ -668,51 +670,73 @@ void Hilltop::Game::TankController::addWeapon(std::shared_ptr<Weapon> weapon, in
     weapons.push_back(std::make_pair(weapon, amount));
 }
 
+void Hilltop::Game::TankController::addRandomWeapon() {
+    const int idx = (int)scale((float)rand(), 0, RAND_MAX, 0, (float)TankMatch::weapons.size());
+    addWeapon(TankMatch::weapons[idx], 1);
+}
+
+int Hilltop::Game::TankController::getWeaponCount() {
+    int ret = 0;
+    for (const std::pair<std::shared_ptr<Weapon>, int> &p : weapons)
+        ret += p.second;
+    return ret;
+}
+
 bool Hilltop::Game::TankController::applyAI(TankMatch *match, TankController &player) {
     if (player.botAttempts.empty()) {
         if (player.botTargetAngle != -1 || player.botTargetPower != -1) {
             if (player.botStepsDone < BOT_STEPS) {
                 if (player.botLastStepTick + BOT_TICKS_BETWEEN_STEPS <= match->tickNumber) {
                     int angleDelta = player.botTargetAngle - player.tank->angle;
+                    if (angleDelta < 2)
+                        angleDelta++;
                     player.tank->angle += angleDelta / 2;
 
                     int powerDelta = player.botTargetPower - player.tank->power;
+                    if (powerDelta < 2)
+                        powerDelta++;
                     player.tank->power += powerDelta / 2;
 
                     player.botStepsDone++;
                     player.botLastStepTick = match->tickNumber;
                 }
             } else {
+                player.tank->angle = player.botTargetAngle;
                 player.botTargetAngle = -1;
+
+                player.tank->power = player.botTargetPower;
                 player.botTargetPower = -1;
 
                 return true;
             }
         } else {
-            for (int i = -10; i <= 10; i++) {
-                int angle = player.tank->angle;
-                if (i >= -5 && i <= 5)
-                    angle += i;
-                else
-                    angle += i * 4;
-                angle = std::max(0, std::min(180, angle));
+            for (int mult = -1; mult <= 1; mult += 2) {
+                for (int i = -10; i <= 10; i++) {
+                    int angle = player.tank->angle;
+                    int angleOff;
+                    if (i >= -5 && i <= 5)
+                        angleOff = i;
+                    else
+                        angleOff = i * 4;
+                    angle = std::max(0, std::min(180, angle + angleOff * mult));
 
-                int power = player.tank->power;
-                if (i >= -5 && i <= 5)
-                    power += i;
-                else
-                    power += i * 3;
-                power = std::max(0, std::min(100, power));
+                    int power = player.tank->power;
+                    if (i >= -5 && i <= 5)
+                        power += i;
+                    else
+                        power += i * 3;
+                    power = std::max(0, std::min(100, power));
 
-                std::shared_ptr<BotAttempt> attempt = BotAttempt::create();
-                attempt->angle = angle;
-                attempt->power = power;
-                attempt->position = player.tank->getBarrelBase() + Tank::getProjectileBase(angle);
-                attempt->direction = Tank::calcTrajectory(angle, power);
-                attempt->physicsSpeed = BOT_ATTEMPT_SPEED;
-                attempt->maxEntityAge = BOT_MAX_ATTEMPT_TIME;
-                player.botAttempts.push_back(attempt);
-                match->addEntity(*attempt);
+                    std::shared_ptr<BotAttempt> attempt = BotAttempt::create();
+                    attempt->angle = player.tank->angle;
+                    attempt->power = power;
+                    attempt->position = player.tank->getProjectileBase();
+                    attempt->direction = Tank::calcTrajectory(player.tank->angle, power);
+                    attempt->physicsSpeed = BOT_ATTEMPT_SPEED;
+                    attempt->maxEntityAge = BOT_MAX_ATTEMPT_TIME;
+                    player.botAttempts.push_back(attempt);
+                    match->addEntity(*attempt);
+                }
             }
 
             for (int i = 0; i < RANDOM_ATTEMPTS_BY_BOT_DIFFICULTY[2]; i++) {
@@ -730,28 +754,48 @@ bool Hilltop::Game::TankController::applyAI(TankMatch *match, TankController &pl
                 match->addEntity(*attempt);
             }
 
+            player.currentWeapon = scale(rand(), 0, RAND_MAX, 0, player.weapons.size() - 1);
+
             player.botStepsDone = 0;
             player.botLastStepTick = match->tickNumber;
 
-            player.botTarget = {
-                scale(rand(), 0, RAND_MAX, 0, match->height - 1),
-                scale(rand(), 0, RAND_MAX, 0, match->width - 1)
-            };
-            {
+            if (!player.botTargetTank || !player.botTargetTank->alive) {
+                player.botTargetTank.reset();
                 std::vector<std::shared_ptr<TankController>> players = match->players;
-                std::sort(players.begin(), players.end(),
-                    [](std::shared_ptr<TankController> x, std::shared_ptr<TankController> y)->bool {
-                    return x->tank->health + x->tank->armor < y->tank->health + y->tank->armor;
-                });
                 for (int i = 0; i < players.size(); i++) {
-                    if (players[i]->tank->alive && players[i]->team != player.team) {
-                        player.botTarget = players[i]->tank->getBarrelBase();
-                        break;
+                    if (!players[i]->tank->alive || players[i]->team == player.team) {
+                        players.erase(players.begin() + i);
+                        i--;
                     }
+                }
+                if (!players.empty()) {
+                    std::sort(players.begin(), players.end(),
+                        [](std::shared_ptr<TankController> x, std::shared_ptr<TankController> y)->bool {
+                        return x->tank->health / 10 < y->tank->health / 10;
+                    });
+                    int maxEq = 0;
+                    for (int i = 1; i < players.size(); i++) {
+                        if (players[i]->tank->health / 10 == players[0]->tank->health / 10)
+                            maxEq = i;
+                        else
+                            break;
+                    }
+                    int idx = maxEq;
+                    if (maxEq > 0)
+                        idx = scale(rand(), 0, RAND_MAX, 0, maxEq);
+                    player.botTarget = players[idx]->tank->getBarrelBase();
+                    player.botTargetTank = players[idx]->tank;
                 }
             }
 
-            player.currentWeapon = scale(rand(), 0, RAND_MAX, 0, player.weapons.size() - 1);
+            if (player.botTargetTank) {
+                player.botTarget = player.botTargetTank->getBarrelBase();
+            } else {
+                player.botTarget = {
+                    scale(rand(), 0, RAND_MAX, 0, match->height - 1),
+                    scale(rand(), 0, RAND_MAX, 0, match->width - 1)
+                };
+            }
         }
     } else {
         std::sort(player.botAttempts.begin(), player.botAttempts.end(),
@@ -1076,12 +1120,17 @@ int Hilltop::Game::TankMatch::getNextPlayer() {
     int maxTeam = currentTeam;
     
     for (int i = 0; i < players.size(); i++) {
+        if (!players[i]->tank->alive)
+            continue;
         int team = players[i]->team;
         if (team < minTeam)
             minTeam = team;
         if (team > maxTeam)
             maxTeam = team;
     }
+    
+    if (minTeam == maxTeam)
+        return -1;
 
     for (int i = currentPlayer + 1; i < players.size(); i++)
         if (players[i]->team == currentTeam && players[i]->tank->alive)

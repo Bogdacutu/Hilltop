@@ -50,6 +50,7 @@ std::shared_ptr<BufferedConsole> console;
 
 
 const int START_WEAPONS = 10;
+const int MIN_WEAPONS = 2;
 
 
 std::shared_ptr<ElementCollection> bottomArea;
@@ -189,7 +190,7 @@ static void callWithConsoleSnapshot(std::function<void()> func) {
     });
 }
 
-static void messageBox(std::string str, std::string title = "") {
+void messageBox(std::string str, std::string title = "") {
     MessageBoxA(nullptr, str.c_str(), title.c_str(), MB_OK);
 }
 
@@ -235,7 +236,7 @@ static void saveGame() {
 
         int angle = player->tank->angle;
         bool right = angle < 90 || angle >= 270;
-        if (right != last_right && i > 0 && last_right)
+        if (right != last_right && i > 0)
             fout << "<p></p>";
         last_right = right;
 
@@ -989,6 +990,10 @@ static void gameLoop() {
                     player->weapons.erase(player->weapons.begin() + player->currentWeapon);
                     player->currentWeapon = 0;
                 }
+                if (player->getWeaponCount() <= MIN_WEAPONS) {
+                    while (player->getWeaponCount() < START_WEAPONS)
+                        player->addRandomWeapon();
+                }
             }
 
             int nextPlayer = match->getNextPlayer();
@@ -1490,10 +1495,8 @@ static bool startGameAction(Form::event_args_t e) {
                 controller->movesLeft = controller->movesPerTurn;
                 match->players.push_back(controller);
 
-                for (int i = 0; i < START_WEAPONS; i++) {
-                    const int idx = (int)scale((float)rand(), 0, RAND_MAX, 0, (float)TankMatch::weapons.size());
-                    controller->addWeapon(TankMatch::weapons[idx], 1);
-                }
+                for (int i = 0; i < START_WEAPONS; i++)
+                    controller->addRandomWeapon();
             }
         }
 

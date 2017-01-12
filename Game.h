@@ -503,6 +503,7 @@ namespace Hilltop {
             template<class Archive>
             void serialize(Archive &ar, const unsigned int version) {
                 ar & botAttempts;
+                ar & botTargetTank;
                 ar & botTarget;
                 ar & botTargetAngle;
                 ar & botTargetPower;
@@ -527,8 +528,9 @@ namespace Hilltop {
                 10, 30, 80
             };
             static const int BOT_STEPS = 6;
-            static const int BOT_TICKS_BETWEEN_STEPS = 5;
+            static const int BOT_TICKS_BETWEEN_STEPS = 4;
             std::vector<std::shared_ptr<BotAttempt>> botAttempts;
+            std::shared_ptr<Tank> botTargetTank;
             Vector2 botTarget;
             int botTargetAngle = -1;
             int botTargetPower = -1;
@@ -546,6 +548,8 @@ namespace Hilltop {
 
             std::vector<std::pair<std::shared_ptr<Weapon>, int>> weapons;
             void addWeapon(std::shared_ptr<Weapon> weapon, int amount);
+            void addRandomWeapon();
+            int getWeaponCount();
 
             static bool applyAI(TankMatch *match, TankController &player);
         };
