@@ -66,7 +66,32 @@ void Hilltop::Game::Entity::onHit(TankMatch *match) {
 }
 
 void Hilltop::Game::Entity::onExpire(TankMatch *match) {
+    hasExpired = true;
     match->removeEntity(*this);
+}
+
+
+
+//
+// BotAttempt
+//
+
+bool Hilltop::Game::BotAttempt::enableDebug = false;
+
+Hilltop::Game::BotAttempt::BotAttempt() {}
+
+std::shared_ptr<BotAttempt> Hilltop::Game::BotAttempt::create() {
+    return std::shared_ptr<BotAttempt>(new BotAttempt());
+}
+
+void Hilltop::Game::BotAttempt::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
+    Entity::onDraw(match, console);
+
+    if (!enableDebug)
+        return;
+
+    Vector2 p = position.round();
+    console.set(p.X, p.Y, color);
 }
 
 
@@ -183,7 +208,7 @@ void Hilltop::Game::Explosion::createLand(TankMatch *match) {
 }
 
 int Hilltop::Game::Explosion::calcDamage(Vector2 point) {
-    return scale(distance(position.round(), point), 0, size, 4 * size, 1);
+    return scale(distance(position.round(), point), 0, size, 10 * size, 1);
 }
 
 void Hilltop::Game::Explosion::hitTanks(TankMatch *match) {
@@ -340,10 +365,13 @@ Vector2 Hilltop::Game::Tank::getBarrelBase() {
 }
 
 Vector2 Hilltop::Game::Tank::getBarrelEnd() {
+    return getBarrelBase() + getBarrelEnd(angle);
+}
+
+Vector2 Hilltop::Game::Tank::getBarrelEnd(int angle) {
     static const float DS2 = std::sqrtf(2.0) * 2.0f;
 
     float a = angle * PI / 180.0f;
-    Vector2 p = getBarrelBase();
 
     Vector2 c = { -std::sinf(a), std::cosf(a) };
     Vector2 c2 = { c.X * c.X, c.Y * c.Y };
@@ -353,12 +381,16 @@ Vector2 Hilltop::Game::Tank::getBarrelEnd() {
     Vector2 r = Vector2(std::sqrtf(term1.X) - std::sqrtf(term2.X),
         std::sqrtf(term1.Y) - std::sqrtf(term2.Y)) * 0.5f;
 
-    return p + r * 2.0f;
+    return r * 2.0f;
 }
 
 Vector2 Hilltop::Game::Tank::getProjectileBase() {
-    Vector2 r = getBarrelEnd().round();
-    Vector2 p = (r - getBarrelBase()).round();
+    return getBarrelBase() + getProjectileBase(angle);
+}
+
+Vector2 Hilltop::Game::Tank::getProjectileBase(Vector2 barrelEnd) {
+    Vector2 p = barrelEnd.round();
+    Vector2 r = p;
 
     if (p.X >= 1.0f)
         r.X += 1.0f;
@@ -371,6 +403,10 @@ Vector2 Hilltop::Game::Tank::getProjectileBase() {
         r.Y -= 1.0f;
 
     return r;
+}
+
+Vector2 Hilltop::Game::Tank::getProjectileBase(int angle) {
+    return getProjectileBase(getBarrelEnd(angle));
 }
 
 Vector2 Hilltop::Game::Tank::calcTrajectory(int angle, int power) {
@@ -567,13 +603,7 @@ void Hilltop::Game::Tank::die(TankMatch *match) {
 
 const std::string Hilltop::Game::Weapon::INVALID_NAME = "<invalid name>";
 
-void Hilltop::Game::Weapon::fire(TankMatch &match, int playerNumber) {
-    std::shared_ptr<TankController> player = match.players[playerNumber];
-    std::shared_ptr<LastHitTracer> tracer = LastHitTracer::create(*player);
-    tracer->position = player->tank->getProjectileBase();
-    tracer->direction = player->tank->calcTrajectory();
-    match.addEntity(*tracer);
-}
+void Hilltop::Game::Weapon::fire(TankMatch &match, int playerNumber) {}
 
 
 
@@ -638,58 +668,124 @@ void Hilltop::Game::TankController::addWeapon(std::shared_ptr<Weapon> weapon, in
     weapons.push_back(std::make_pair(weapon, amount));
 }
 
-void Hilltop::Game::TankController::applyAI(TankMatch *match, TankController &player) {
-    player.currentWeapon = scale(rand(), 0, RAND_MAX, 0, player.weapons.size() - 1);
+bool Hilltop::Game::TankController::applyAI(TankMatch *match, TankController &player) {
+    if (player.botAttempts.empty()) {
+        if (player.botTargetAngle != -1 || player.botTargetPower != -1) {
+            if (player.botStepsDone < BOT_STEPS) {
+                if (player.botLastStepTick + BOT_TICKS_BETWEEN_STEPS <= match->tickNumber) {
+                    int angleDelta = player.botTargetAngle - player.tank->angle;
+                    player.tank->angle += angleDelta / 2;
 
-    std::shared_ptr<Tank> target;
-    for (int i = 0; i < match->players.size(); i++) {
-        std::shared_ptr<Tank> t = match->players[i]->tank;
-        if (t == player.tank || match->players[i]->team == player.team)
-            continue;
-        if (!target || distance(target->position, player.tank->position) <
-            distance(t->position, player.tank->position)) {
-            target = t;
+                    int powerDelta = player.botTargetPower - player.tank->power;
+                    player.tank->power += powerDelta / 2;
+
+                    player.botStepsDone++;
+                    player.botLastStepTick = match->tickNumber;
+                }
+            } else {
+                player.botTargetAngle = -1;
+                player.botTargetPower = -1;
+
+                return true;
+            }
+        } else {
+            for (int i = -10; i <= 10; i++) {
+                int angle = player.tank->angle;
+                if (i >= -5 && i <= 5)
+                    angle += i;
+                else
+                    angle += i * 4;
+                angle = std::max(0, std::min(180, angle));
+
+                int power = player.tank->power;
+                if (i >= -5 && i <= 5)
+                    power += i;
+                else
+                    power += i * 3;
+                power = std::max(0, std::min(100, power));
+
+                std::shared_ptr<BotAttempt> attempt = BotAttempt::create();
+                attempt->angle = angle;
+                attempt->power = power;
+                attempt->position = player.tank->getBarrelBase() + Tank::getProjectileBase(angle);
+                attempt->direction = Tank::calcTrajectory(angle, power);
+                attempt->physicsSpeed = BOT_ATTEMPT_SPEED;
+                attempt->maxEntityAge = BOT_MAX_ATTEMPT_TIME;
+                player.botAttempts.push_back(attempt);
+                match->addEntity(*attempt);
+            }
+
+            for (int i = 0; i < RANDOM_ATTEMPTS_BY_BOT_DIFFICULTY[2]; i++) {
+                int angle = scale(rand(), 0, RAND_MAX, 0, 180);
+                int power = scale(rand(), 0, RAND_MAX, 0, 100);
+
+                std::shared_ptr<BotAttempt> attempt = BotAttempt::create();
+                attempt->angle = angle;
+                attempt->power = power;
+                attempt->position = player.tank->getBarrelBase() + Tank::getProjectileBase(angle);
+                attempt->direction = Tank::calcTrajectory(angle, power);
+                attempt->physicsSpeed = BOT_ATTEMPT_SPEED;
+                attempt->maxEntityAge = BOT_MAX_ATTEMPT_TIME;
+                player.botAttempts.push_back(attempt);
+                match->addEntity(*attempt);
+            }
+
+            player.botStepsDone = 0;
+            player.botLastStepTick = match->tickNumber;
+
+            player.botTarget = {
+                scale(rand(), 0, RAND_MAX, 0, match->height - 1),
+                scale(rand(), 0, RAND_MAX, 0, match->width - 1)
+            };
+            {
+                std::vector<std::shared_ptr<TankController>> players = match->players;
+                std::sort(players.begin(), players.end(),
+                    [](std::shared_ptr<TankController> x, std::shared_ptr<TankController> y)->bool {
+                    return x->tank->health + x->tank->armor < y->tank->health + y->tank->armor;
+                });
+                for (int i = 0; i < players.size(); i++) {
+                    if (players[i]->tank->alive && players[i]->team != player.team) {
+                        player.botTarget = players[i]->tank->getBarrelBase();
+                        break;
+                    }
+                }
+            }
+
+            player.currentWeapon = scale(rand(), 0, RAND_MAX, 0, player.weapons.size() - 1);
         }
+    } else {
+        std::sort(player.botAttempts.begin(), player.botAttempts.end(),
+            [player](std::shared_ptr<BotAttempt> x, std::shared_ptr<BotAttempt> y)->bool {
+            Vector2 p1 = x->position.round();
+            Vector2 p2 = y->position.round();
+            if (p1 != p2)
+                return distance(player.botTarget, p1) < distance(player.botTarget, p2);
+
+            int a1 = x->angle;
+            int a2 = y->angle;
+            if (a1 != a2)
+                return std::abs(player.tank->angle - a1) < std::abs(player.tank->angle - a2);
+
+            return std::abs(player.tank->power - x->power) < std::abs(player.tank->power - y->power);
+        });
+
+        player.botAttempts[0]->color = GREEN;
+        for (int i = 1; i < player.botAttempts.size(); i++)
+            player.botAttempts[i]->color = RED;
+
+        for (int i = 0; i < player.botAttempts.size(); i++)
+            if (!player.botAttempts[i]->hasHit && !player.botAttempts[i]->hasExpired)
+                return false;
+
+        player.botTargetAngle = player.botAttempts[0]->angle;
+        player.botTargetPower = player.botAttempts[0]->power;
+
+        for (int i = 0; i < player.botAttempts.size(); i++)
+            match->removeEntity(*player.botAttempts[i]);
+        player.botAttempts.clear();
     }
 
-    if (target) {
-        int optimalAngle = scale(match->highestLand, 0, match->height, 80, 30);
-        if (target->position.Y < player.tank->position.Y)
-            optimalAngle = 180 - optimalAngle;
-        int angleDelta = optimalAngle - player.tank->angle;
-        int newAngle = player.tank->angle + angleDelta / 2;
-        player.tank->angle = std::max(0, std::min(180, newAngle));
-
-        if (player.hasLastHit) {
-            int powerDelta = std::abs(scale(target->position.Y - player.lastHit.Y, 0, 100, 0, 10) *
-                scale(match->highestLand, 0, match->height, 4, 1));
-            int newPower = player.tank->power + powerDelta;
-            player.tank->power = std::max(0, std::min(100, newPower));
-        }
-    }
-}
-
-
-
-//
-// LastHitTracer
-//
-
-Hilltop::Game::LastHitTracer::LastHitTracer(TankController &player) : player(player.shared_from_this()) {}
-
-std::shared_ptr<LastHitTracer> Hilltop::Game::LastHitTracer::create(TankController &player) {
-    return std::shared_ptr<LastHitTracer>(new LastHitTracer(player));
-}
-
-void Hilltop::Game::LastHitTracer::onTick(TankMatch *match) {
-    Entity::onTick(match);
-
-    player->lastHit = position.round();
-    player->hasLastHit = true;
-}
-
-void Hilltop::Game::LastHitTracer::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
-    return Entity::onDraw(match, console);
+    return false;
 }
 
 
@@ -733,21 +829,25 @@ bool Hilltop::Game::TankMatch::doEntityTick() {
         if (p->entityAge <= 0)
             continue;
 
-        Vector2 oldPos = p->position;
-        Vector2 newPos = oldPos + p->direction;
-        std::pair<bool, Vector2> hit = checkForHit(oldPos, newPos, p->groundHog);
-        p->position = hit.second;
-        if (hit.first)
-            p->onHit(this);
+        for (int i = 0; i < p->physicsSpeed; i++) {
+            Vector2 oldPos = p->position;
+            Vector2 newPos = oldPos + p->direction;
+            std::pair<bool, Vector2> hit = checkForHit(oldPos, newPos, p->groundHog);
+            p->position = hit.second;
+            if (hit.first)
+                p->onHit(this);
 
-        if (oldPos.round() != p->position.round())
-            ret = true;
+            if (oldPos.round() != p->position.round())
+                ret = true;
 
-        p->direction = p->direction + gravity * p->gravityMult;
+            p->direction = p->direction + gravity * p->gravityMult;
+        }
 
         Vector2 pos = p->position.round();
-        if (pos.Y < 0 || pos.Y >= width || pos.X > height + 1)
+        if (pos.Y < 0 || pos.Y >= width || pos.X > height + 1) {
+            p->onExpire(this);
             removeEntity(*p);
+        }
     }
 
     return ret;
@@ -912,7 +1012,7 @@ void Hilltop::Game::TankMatch::draw(Console::Console &console) {
         p->onDraw(this, canvas);
     }
 
-    if (isAiming) {
+    if (isAiming && players[currentPlayer]->isHuman) {
         if (tickNumber % (AIM_RETICLE_TIME * 2) < AIM_RETICLE_TIME)
             players[currentPlayer]->tank->drawReticle(this, canvas);
     }

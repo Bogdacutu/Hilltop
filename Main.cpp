@@ -22,6 +22,7 @@
 #include "Game.h"
 
 BOOST_CLASS_EXPORT(Hilltop::Game::Entity)
+BOOST_CLASS_EXPORT(Hilltop::Game::BotAttempt)
 BOOST_CLASS_EXPORT(Hilltop::Game::SimpleRocket)
 BOOST_CLASS_EXPORT(Hilltop::Game::SimpleTrailedRocket)
 BOOST_CLASS_EXPORT(Hilltop::Game::RocketTrail)
@@ -29,7 +30,6 @@ BOOST_CLASS_EXPORT(Hilltop::Game::Explosion)
 BOOST_CLASS_EXPORT(Hilltop::Game::Tracer)
 BOOST_CLASS_EXPORT(Hilltop::Game::TankWheel)
 BOOST_CLASS_EXPORT(Hilltop::Game::Tank)
-BOOST_CLASS_EXPORT(Hilltop::Game::LastHitTracer)
 
 BOOST_CLASS_EXPORT(Hilltop::Game::Weapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::RocketWeapon)
@@ -194,14 +194,14 @@ static void messageBox(std::string str, std::string title = "") {
 }
 
 static void saveGame() {
-    static const std::string HTML_BEGIN = "<html><head><title>Hilltop Save File</title><style>body{text-align:center;font-family:Verdana,sans-serif;font-size:18pt}div{margin:10px;display:inline-block}span{font-size:1pt;display:block;margin:0;padding:0}b,i{display:inline-block;width:10px;height:10px}i{background-color:white}a{font-size:11pt;position:relative;top:-4pt;color:blue}p{display:inline-block;width:16px}</style></head><body><br>";
+    static const std::string HTML_BEGIN = "<html><head><title>Hilltop Save File</title><style>body{text-align:center;font-family:Verdana,sans-serif;font-size:18pt}div{margin:10px;display:inline-block}span{font-size:0;display:block;margin:0;padding:0}b,i{display:inline-block;width:10px;height:10px}i{background-color:white}a{font-size:11pt;position:relative;top:-4pt;color:blue}p{display:inline-block;width:16px}pre{color:#ccc;white-space:normal;word-wrap:break-word;max-width:600px;font-size:7pt;margin-left:auto;margin-right:auto;text-align:justify}</style></head><body onload='document.getElementsByTagName(\"pre\")[0].innerHTML=atob(document.childNodes[1].textContent.trim())'><br>";
     static const std::string TANK_COMMON = "<span><i></i><b></b><b></b><b></b><b></b><b></b><i></i></span><span><b></b><b></b><b></b><b></b><b></b><b></b><b></b></span>";
     static const std::string TANK_LEFT = "<span><b></b><i></i><i></i><i></i><i></i><i></i><i></i></span><span><i></i><b></b><i></i><i></i><i></i><i></i><i></i></span><span><i></i><i></i><b></b><i></i><i></i><i></i><i></i></span>" + TANK_COMMON;
     static const std::string TANK_RIGHT = "<span><i></i><i></i><i></i><i></i><i></i><i></i><b></b></span><span><i></i><i></i><i></i><i></i><i></i><b></b><i></i></span><span><i></i><i></i><i></i><i></i><b></b><i></i><i></i></span>" + TANK_COMMON;
-    static const std::string HTML_END = "<br><br>This is a save file for Hilltop.<br>Load it to continue your match.<br><br>Hilltop is a tank artillery game.<br>Download Hilltop at:<br><a href='https://github.com/Bogdacutu/Hilltop'>https://github.com/Bogdacutu/Hilltop</a></body></html>";
+    static const std::string HTML_END = "<br><br>This is a save file for Hilltop.<br>Load it to continue your match.<br><br>Hilltop is a tank artillery game.<br>Download Hilltop at:<br><a href='https://github.com/Bogdacutu/Hilltop'>https://github.com/Bogdacutu/Hilltop</a><br><br><br><pre></pre></body></html>";
 
     using namespace boost::archive::iterators;
-    typedef base64_from_binary<transform_width<std::string::iterator, 6, 7>> base64_t;
+    typedef base64_from_binary<transform_width<std::string::iterator, 6, 8>> base64_t;
 
     if (!askSaveFile())
         return;
@@ -216,6 +216,7 @@ static void saveGame() {
     {
         std::string data = ss.str();
         std::copy(base64_t(data.begin()), base64_t(data.end()), std::ostream_iterator<char>(fout));
+        fout << std::string((3 - data.size() % 3) % 3, '=');
         ss.clear();
     }
     fout << " -->";
@@ -234,7 +235,7 @@ static void saveGame() {
 
         int angle = player->tank->angle;
         bool right = angle < 90 || angle >= 270;
-        if (right != last_right && i > 0)
+        if (right != last_right && i > 0 && last_right)
             fout << "<p></p>";
         last_right = right;
 
@@ -252,7 +253,7 @@ static void saveGame() {
 
 static bool loadGame() {
     using namespace boost::archive::iterators;
-    typedef transform_width<binary_from_base64<std::string::iterator>, 7, 6> binary_t;
+    typedef transform_width<binary_from_base64<std::string::iterator>, 8, 6> binary_t;
     
     if (!askLoadFile())
         return false;
@@ -932,7 +933,8 @@ static void gameLoop() {
     tickLoop([&]() {
         if (!match->gameOver) {
             match->tick();
-            gameForm->tick(match->isAiming, gameGlobalAction);
+            gameForm->tick(match->isAiming && match->players[match->currentPlayer]->isHuman,
+                gameGlobalAction);
         } else {
             gameForm->tick(false, gameGlobalAction);
         }
@@ -949,6 +951,8 @@ static void gameLoop() {
         std::ostringstream tickCounterText;
         if (match->gameOver)
             tickCounterText << "Game over! - ";
+        else if (match->isAiming && !match->players[match->currentPlayer]->isHuman)
+            tickCounterText << "Bot thinking - ";
         tickCounterText << "Tick " << match->tickNumber;
         tickCounter->text = tickCounterText.str();
         tickCounter->draw(*console);
@@ -958,7 +962,7 @@ static void gameLoop() {
         bottomArea->draw(*console);
         weaponAreaDraw();
 
-        if (match->isAiming) {
+        if (match->isAiming && match->players[match->currentPlayer]->isHuman) {
             gameForm->draw(*console, *bottomArea);
             if (gameForm->currentPos == WEAPON_AREA && gameForm->isFocused)
                 drawWeaponList();
@@ -970,6 +974,13 @@ static void gameLoop() {
             if (!match->shownGameOver) {
                 messageBox("Game over!");
                 match->shownGameOver = true;
+            }
+        } else if (match->isAiming) {
+            if (!match->players[match->currentPlayer]->isHuman) {
+                match->isAiming = !TankController::applyAI(match.get(),
+                    *match->players[match->currentPlayer]);
+                if (!match->isAiming)
+                    match->fire();
             }
         } else if (!match->isAiming && !match->recentUpdatesMattered()) {
             for (int i = 0; i < match->players.size(); i++) {
@@ -985,12 +996,7 @@ static void gameLoop() {
                 match->currentPlayer = nextPlayer;
                 match->players[match->currentPlayer]->movesLeft =
                     match->players[match->currentPlayer]->movesPerTurn;
-                if (match->players[match->currentPlayer]->isHuman) {
-                    match->isAiming = true;
-                } else {
-                    TankController::applyAI(match.get(), *match->players[match->currentPlayer]);
-                    match->fire();
-                }
+                match->isAiming = true;
             } else {
                 match->gameOver = true;
             }

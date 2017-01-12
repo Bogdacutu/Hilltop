@@ -94,8 +94,10 @@ namespace Hilltop {
                 ar & gravityMult;
                 ar & groundHog;
                 ar & hasHit;
+                ar & hasExpired;
                 ar & entityAge;
                 ar & maxEntityAge;
+                ar & physicsSpeed;
             }
 
         protected:
@@ -108,8 +110,10 @@ namespace Hilltop {
 
             bool groundHog = false;
             bool hasHit = false;
+            bool hasExpired = false;
             int entityAge = 0;
             int maxEntityAge = -1;
+            int physicsSpeed = 1;
 
             virtual ~Entity();
             static std::shared_ptr<Entity> create();
@@ -118,6 +122,33 @@ namespace Hilltop {
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console);
             virtual void onHit(TankMatch *match);
             virtual void onExpire(TankMatch *match);
+        };
+
+
+        class BotAttempt : public Entity {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Entity>(*this);
+                ar & color;
+                ar & angle;
+                ar & power;
+            }
+
+        protected:
+            BotAttempt();
+
+        public:
+            static bool enableDebug;
+            ConsoleColor color = ConsoleColor::RED;
+
+            int angle;
+            int power;
+
+            static std::shared_ptr<BotAttempt> create();
+
+            virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
         };
 
 
@@ -356,7 +387,10 @@ namespace Hilltop {
 
             Vector2 getBarrelBase();
             Vector2 getBarrelEnd();
+            static Vector2 getBarrelEnd(int angle);
             Vector2 getProjectileBase();
+            static Vector2 getProjectileBase(Vector2 barrelEnd);
+            static Vector2 getProjectileBase(int angle);
 
             static Vector2 calcTrajectory(int angle, int power);
             Vector2 calcTrajectory();
@@ -468,14 +502,18 @@ namespace Hilltop {
             friend class boost::serialization::access;
             template<class Archive>
             void serialize(Archive &ar, const unsigned int version) {
+                ar & botAttempts;
+                ar & botTarget;
+                ar & botTargetAngle;
+                ar & botTargetPower;
+                ar & botStepsDone;
+                ar & botLastStepTick;
                 ar & tank;
                 ar & team;
                 ar & isHuman;
                 ar & currentWeapon;
                 ar & movesPerTurn;
                 ar & movesLeft;
-                ar & lastHit;
-                ar & hasLastHit;
                 ar & weapons;
             }
 
@@ -483,6 +521,20 @@ namespace Hilltop {
             TankController();
 
         public:
+            static const int BOT_ATTEMPT_SPEED = 5;
+            static const int BOT_MAX_ATTEMPT_TIME = 80;
+            static constexpr int RANDOM_ATTEMPTS_BY_BOT_DIFFICULTY[] = {
+                10, 30, 80
+            };
+            static const int BOT_STEPS = 6;
+            static const int BOT_TICKS_BETWEEN_STEPS = 5;
+            std::vector<std::shared_ptr<BotAttempt>> botAttempts;
+            Vector2 botTarget;
+            int botTargetAngle = -1;
+            int botTargetPower = -1;
+            int botStepsDone;
+            int botLastStepTick;
+
             std::shared_ptr<Tank> tank;
             int team = 1;
             bool isHuman = true;
@@ -490,51 +542,13 @@ namespace Hilltop {
             int movesPerTurn = 25;
             int movesLeft = movesPerTurn;
 
-            Vector2 lastHit;
-            bool hasLastHit = false;
-
             static std::shared_ptr<TankController> create();
 
             std::vector<std::pair<std::shared_ptr<Weapon>, int>> weapons;
             void addWeapon(std::shared_ptr<Weapon> weapon, int amount);
 
-            static void applyAI(TankMatch *match, TankController &player);
+            static bool applyAI(TankMatch *match, TankController &player);
         };
-
-
-        class LastHitTracer : public Tracer {
-        private:
-            friend class boost::serialization::access;
-            template<class Archive>
-            friend inline void load_construct_data(Archive &ar, LastHitTracer *t, const unsigned int);
-            template<class Archive>
-            void serialize(Archive &ar, const unsigned int version) {
-                ar & boost::serialization::base_object<Tracer>(*this);
-            }
-
-        protected:
-            LastHitTracer(TankController &player);
-
-        public:
-            const std::shared_ptr<TankController> player;
-
-            static std::shared_ptr<LastHitTracer> create(TankController &player);
-
-            virtual void onTick(TankMatch *match) override;
-            virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
-        };
-
-        template<class Archive>
-        inline void save_construct_data(Archive &ar, const LastHitTracer *t, const unsigned int) {
-            ar << t->player;
-        }
-
-        template<class Archive>
-        inline void load_construct_data(Archive &ar, LastHitTracer *t, const unsigned int) {
-            std::shared_ptr<TankController> player;
-            ar >> player;
-            ::new(t) LastHitTracer(*player);
-        }
 
 
 
