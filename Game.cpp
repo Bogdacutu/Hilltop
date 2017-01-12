@@ -540,29 +540,22 @@ void Hilltop::Game::Tank::doMove(TankMatch *match, int direction) {
     if (p.X < 0.0f || p.X >= match->width - 5.0f)
         return;
 
-    bool ret = true;
-    for (int i = 1; i <= 2; i++) {
-        for (int j = 0; j < 5; j++) {
-            if (match->get(p.X - i, p.Y + j) != TankMatch::AIR) {
-                ret = false;
-                break;
-            }
-        }
-    }
-    if (ret) {
-        position = p;
-    } else {
+    bool ret;
+    for (int off = 0; off <= 3; off++) {
         ret = true;
         for (int i = 1; i <= 2; i++) {
             for (int j = 0; j < 5; j++) {
-                if (match->get(p.X - i - 1, p.Y + j) != TankMatch::AIR) {
+                if (match->get(p.X - i, p.Y + j) != TankMatch::AIR) {
                     ret = false;
                     break;
                 }
             }
         }
-        if (ret)
-            position = p + Vector2(-1.0f, 0.0f);
+        if (ret) {
+            position = p;
+            break;
+        }
+        p.X--;
     }
 
     if (ret)
@@ -1201,9 +1194,6 @@ void Hilltop::Game::TankMatch::draw(Console::BufferedConsole &console) {
 void Hilltop::Game::TankMatch::tick() {
     tickNumber++;
     updateMattered = false;
-
-    if (tickNumber % 100 == 99)
-        doAirdrop();
 
     if (tickNumber % LAND_PHYSICS_EVERY_TICKS == 0)
         updateMattered |= doLandPhysics();

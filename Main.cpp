@@ -194,8 +194,55 @@ static void callWithConsoleSnapshot(std::function<void()> func) {
     });
 }
 
-void messageBox(std::string str, std::string title = "") {
-    MessageBoxA(nullptr, str.c_str(), title.c_str(), MB_OK);
+void messageBoxImpl(std::string text, std::string title) {
+    int left = console->width / 4;
+    int right = console->width - left;
+    int width = right - left;
+    TextBoxSize size = printText(nullptr, 0, 0, width, console->height, text, WHITE);
+    int top = std::max(0, (console->height - size.lines - 4) / 2);
+    width = std::max<int>(size.cols, (int)title.length()) + 12;
+    left = (console->width - width) / 2;
+    int height = size.lines + 4;
+    top = (console->height - height) / 2;
+    std::shared_ptr<BufferedConsoleRegion> sub = BufferedConsoleRegion::create(*console,
+        width, height, top, left);
+    std::shared_ptr<BufferedConsoleRegion> subSub = BufferedConsoleRegion::create(*sub,
+        sub->width - 4, sub->height - 2, 1, 2);
+    std::shared_ptr<Form> form = std::make_shared<Form>(1);
+    bool exit = false;
+
+    tickLoop([&]() {
+        form->tick(false, [&](Form::event_args_t e) {
+            if (e.type == Form::KEY) {
+                switch (e.record.wVirtualKeyCode) {
+                case VK_RETURN:
+                case VK_SPACE:
+                case VK_ESCAPE:
+                    exit = true;
+                    break;
+                }
+            }
+        });
+    }, [&]()->bool {
+        if (exit)
+            return false;
+
+        sub->clear(WHITE);
+        subSub->clear(BLACK);
+
+        if (title.length())
+            printText(sub.get(), 0, 0, sub->width, 1, "- " + title + " -", DARK_GRAY, CENTER, false);
+        printText(subSub.get(), 1, 1, subSub->width - 2, subSub->height - 2, text, GRAY, CENTER);
+        
+        console->commit();
+        return true;
+    });
+}
+
+void messageBox(std::string text, std::string title = "") {
+    callWithConsoleSnapshot([text, title]() {
+        messageBoxImpl(text, title);
+    });
 }
 
 static void saveGame() {
@@ -1002,6 +1049,8 @@ static void gameLoop() {
                 match->players[match->currentPlayer]->movesLeft =
                     match->players[match->currentPlayer]->movesPerTurn;
                 match->isAiming = true;
+                if (rand() % TankMatch::AIRDROP_EVERY_TURNS == 0)
+                    match->doAirdrop();
             } else {
                 match->gameOver = true;
             }

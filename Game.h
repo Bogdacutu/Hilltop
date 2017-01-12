@@ -737,6 +737,8 @@ namespace Hilltop {
             static const int DEFAULT_MATCH_WIDTH = 180;
             static const int DEFAULT_MATCH_HEIGHT = 90;
 
+            static const int AIRDROP_EVERY_TURNS = 12;
+
             const unsigned short width, height;
             Console::DoublePixelBufferedConsole canvas;
 
