@@ -22,12 +22,21 @@
     <Filter Include="UI">
       <UniqueIdentifier>{66cf25c8-3c04-4e1c-93a2-73ba54d25ab8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Game">
+      <UniqueIdentifier>{be8d02c5-af6e-42f1-86a0-762ef1a40a11}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Entities">
+      <UniqueIdentifier>{78983519-37ae-40f6-945b-66a46579dac1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Weapons">
+      <UniqueIdentifier>{0289bf4d-a376-49f4-8adc-f1ad135c12d6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Entities\Drops">
+      <UniqueIdentifier>{eabf97cf-1a7e-4dd4-85aa-22156b1a6f75}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Game.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Console\ConsoleColor.cpp">
@@ -75,11 +84,98 @@
     <ClCompile Include="UI\Form.cpp">
       <Filter>UI</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Vector2.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Entity.cpp">
+      <Filter>Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\TankMatch.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Weapon.cpp">
+      <Filter>Game\Weapons</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Tank.cpp">
+      <Filter>Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\BotAttempt.cpp">
+      <Filter>Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\TankController.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\SimpleRocket.cpp">
+      <Filter>Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Explosion.cpp">
+      <Filter>Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\TankWheel.cpp">
+      <Filter>Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Drop.cpp">
+      <Filter>Game\Entities\Drops</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\HealthDrop.cpp">
+      <Filter>Game\Entities\Drops</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\ArmorDrop.cpp">
+      <Filter>Game\Entities\Drops</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\WeaponDrop.cpp">
+      <Filter>Game\Entities\Drops</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\RocketWeapon.cpp">
+      <Filter>Game\Weapons</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\SimpleTrailedRocket.cpp">
+      <Filter>Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\RocketTrail.cpp">
+      <Filter>Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\GroundTrailedRocket.cpp">
+      <Filter>Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\BouncyTrailedRocket.cpp">
+      <Filter>Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Tracer.cpp">
+      <Filter>Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\ParticleBomb.cpp">
+      <Filter>Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\BulletRainCloud.cpp">
+      <Filter>Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Minigun.cpp">
+      <Filter>Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\DirtRocketWeapon.cpp">
+      <Filter>Game\Weapons</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\GroundRocketWeapon.cpp">
+      <Filter>Game\Weapons</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\BouncyRocketWeapon.cpp">
+      <Filter>Game\Weapons</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\ParticleBombWeapon.cpp">
+      <Filter>Game\Weapons</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\BulletRainWeapon.cpp">
+      <Filter>Game\Weapons</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\TracerWeapon.cpp">
+      <Filter>Game\Weapons</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\MinigunWeapon.cpp">
+      <Filter>Game\Weapons</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Game.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="UI.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -133,6 +229,96 @@
     </ClInclude>
     <ClInclude Include="UI\Form.h">
       <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Vector2.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Entity.h">
+      <Filter>Game\Entities</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\TankMatch.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Weapon.h">
+      <Filter>Game\Weapons</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Tank.h">
+      <Filter>Game\Entities</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\BotAttempt.h">
+      <Filter>Game\Entities</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\TankController.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\SimpleRocket.h">
+      <Filter>Game\Entities</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Explosion.h">
+      <Filter>Game\Entities</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\TankWheel.h">
+      <Filter>Game\Entities</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Drop.h">
+      <Filter>Game\Entities\Drops</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\HealthDrop.h">
+      <Filter>Game\Entities\Drops</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\ArmorDrop.h">
+      <Filter>Game\Entities\Drops</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\WeaponDrop.h">
+      <Filter>Game\Entities\Drops</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\RocketWeapon.h">
+      <Filter>Game\Weapons</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\SimpleTrailedRocket.h">
+      <Filter>Game\Entities</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\RocketTrail.h">
+      <Filter>Game\Entities</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\GroundTrailedRocket.h">
+      <Filter>Game\Entities</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\BouncyTrailedRocket.h">
+      <Filter>Game\Entities</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Tracer.h">
+      <Filter>Game\Entities</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\ParticleBomb.h">
+      <Filter>Game\Entities</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\BulletRainCloud.h">
+      <Filter>Game\Entities</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Minigun.h">
+      <Filter>Game\Entities</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\DirtRocketWeapon.h">
+      <Filter>Game\Weapons</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\GroundRocketWeapon.h">
+      <Filter>Game\Weapons</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\BouncyRocketWeapon.h">
+      <Filter>Game\Weapons</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\ParticleBombWeapon.h">
+      <Filter>Game\Weapons</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\BulletRainWeapon.h">
+      <Filter>Game\Weapons</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\TracerWeapon.h">
+      <Filter>Game\Weapons</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\MinigunWeapon.h">
+      <Filter>Game\Weapons</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

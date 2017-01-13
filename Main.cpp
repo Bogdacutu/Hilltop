@@ -1,52 +1,112 @@
-﻿#include "Console.h"
-#include "Console.Windows.h"
-#include "UI.h"
+﻿#include "Console/BufferedNativeConsole.h"
+#include "Console/SnapshotConsole.h"
+#include "Console/Windows/WindowsConsole.h"
+#include "Game/TankController.h"
+#include "UI/Button.h"
+#include "UI/ElementCollection.h"
+#include "UI/Form.h"
+#include "UI/ProgressBar.h"
+#include "UI/TextBox.h"
 #include <boost/archive/iterators/base64_from_binary.hpp>
 #include <boost/archive/iterators/binary_from_base64.hpp>
 #include <boost/archive/iterators/transform_width.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
+#include <boost/serialization/access.hpp>
+#include <boost/serialization/base_object.hpp>
+#include <boost/serialization/deque.hpp>
 #include <boost/serialization/export.hpp>
+#include <boost/serialization/queue.hpp>
+#include <boost/serialization/set.hpp>
+#include <boost/serialization/shared_ptr.hpp>
+#include <boost/serialization/utility.hpp>
+#include <boost/serialization/vector.hpp>
 #include <deque>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <sstream>
-
 #include <Windows.h>
-#undef min
-#undef max
+
 #define VK_A 0x41
 
-
-#include "Game.h"
-
+#include "Game/Entity.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::Entity)
+
+#include "Game/BotAttempt.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::BotAttempt)
+
+#include "Game/SimpleRocket.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::SimpleRocket)
+
+#include "Game/SimpleTrailedRocket.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::SimpleTrailedRocket)
+
+#include "Game/GroundTrailedRocket.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::GroundTrailedRocket)
+
+#include "Game/BouncyTrailedRocket.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::BouncyTrailedRocket)
+
+#include "Game/RocketTrail.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::RocketTrail)
+
+#include "Game/Explosion.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::Explosion)
+
+#include "Game/Tracer.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::Tracer)
+
+#include "Game/TankWheel.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::TankWheel)
+
+#include "Game/Tank.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::Tank)
+
+#include "Game/Drop.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::Drop)
+
+#include "Game/HealthDrop.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::HealthDrop)
+
+#include "Game/ArmorDrop.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::ArmorDrop)
+
+#include "Game/WeaponDrop.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::WeaponDrop)
+
+#include "Game/ParticleBomb.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::ParticleBomb)
+
+#include "Game/BulletRainCloud.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::BulletRainCloud)
+
+#include "Game/Minigun.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::Minigun)
 
+#include "Game/Weapon.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::Weapon)
+
+#include "Game/RocketWeapon.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::RocketWeapon)
+
+#include "Game/DirtRocketWeapon.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::DirtRocketWeapon)
+
+#include "Game/GroundRocketWeapon.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::GroundRocketWeapon)
+
+#include "Game/BouncyRocketWeapon.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::BouncyRocketWeapon)
+
+#include "Game/ParticleBombWeapon.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::ParticleBombWeapon)
+
+#include "Game/BulletRainWeapon.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::BulletRainWeapon)
+
+#include "Game/MinigunWeapon.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::MinigunWeapon)
 
 
