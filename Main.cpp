@@ -239,7 +239,7 @@ void messageBoxImpl(std::string text, std::string title) {
         subSub->clear(BLACK);
 
         if (title.length())
-            printText(sub.get(), 0, 0, sub->width, 1, "- " + title + " -", DARK_GRAY, CENTER, false);
+            printText(sub.get(), 0, 0, sub->width, 1, "- " + title + " -", BLACK, CENTER, false);
         printText(subSub.get(), 1, 1, subSub->width - 2, subSub->height - 2, text, GRAY, CENTER);
         
         console->commit();
@@ -933,7 +933,24 @@ static bool gameGlobalAction(Form::event_args_t e) {
     return false;
 }
 
+enum PlayerTeam {
+    TEAM_RED = 1,
+    TEAM_GREEN = 2,
+    TEAM_BLUE = 3,
+    TEAM_YELLOW = 4,
+};
+
+const char *PLAYER_TEAM_NAMES[] = {
+    "invalid",
+    "Red",
+    "Green",
+    "Blue",
+    "Yellow"
+};
+
 static void gameLoop() {
+    static const bool SHOW_TICKS = false;
+
     console = WindowsConsole::create(GetStdHandle(STD_OUTPUT_HANDLE), match->width + 4,
         match->height / 2 + 15);
 
@@ -1004,12 +1021,27 @@ static void gameLoop() {
 
         match->draw(*mainRegion);
 
+        std::string gameOverText;
+        if (match->gameOver) {
+            for (int i = 0; i < match->players.size(); i++) {
+                if (match->players[i]->tank->alive) {
+                    gameOverText = PLAYER_TEAM_NAMES[match->players[i]->team];
+                    gameOverText += " won!";
+                    break;
+                }
+            }
+        }
+
         std::ostringstream tickCounterText;
         if (match->gameOver)
-            tickCounterText << "Game over! - ";
+            tickCounterText << gameOverText;
         else if (match->isAiming && !match->players[match->currentPlayer]->isHuman)
-            tickCounterText << "Bot thinking - ";
-        tickCounterText << "Tick " << match->tickNumber;
+            tickCounterText << "Bot thinking";
+        if (SHOW_TICKS) {
+            if (tickCounterText.str().size())
+                tickCounterText << " - ";
+            tickCounterText << "Tick " << match->tickNumber;
+        }
         tickCounter->text = tickCounterText.str();
         tickCounter->draw(*console);
 
@@ -1028,7 +1060,7 @@ static void gameLoop() {
         
         if (match->gameOver) {
             if (!match->shownGameOver) {
-                messageBox("Game over!");
+                messageBox(gameOverText, "Game over");
                 match->shownGameOver = true;
             }
         } else if (match->isAiming) {
@@ -1130,21 +1162,6 @@ const char *BOT_DIFFICULTY_NAMES[] = {
     "Easy",
     "Medium",
     "Hard"
-};
-
-enum PlayerTeam {
-    TEAM_RED = 1,
-    TEAM_BLUE = 2,
-    TEAM_GREEN = 3,
-    TEAM_YELLOW = 4,
-};
-
-const char *PLAYER_TEAM_NAMES[] = {
-    "invalid",
-    "Red",
-    "Blue",
-    "Green",
-    "Yellow"
 };
 
 enum TankAttribute {
@@ -1610,7 +1627,7 @@ static void newGameMenu() {
         playerType[i]->width = 6;
         playerType[i]->height = 1;
         playerType[i]->x = i * 2 + 1;
-        playerType[i]->y = playerText[i]->y + playerText[i]->width + 5;
+        playerType[i]->y = playerText[i]->y + playerText[i]->width + 4;
         playerType[i]->alignment = CENTER;
         newGameMenu->addChild(*playerType[i]);
 

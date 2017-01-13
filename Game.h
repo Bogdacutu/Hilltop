@@ -240,6 +240,7 @@ namespace Hilltop {
         public:
             static std::shared_ptr<GroundTrailedRocket> create();
 
+            virtual void onTick(TankMatch *match) override;
             virtual void onHit(TankMatch *match) override;
         };
 
@@ -373,6 +374,7 @@ namespace Hilltop {
 
             virtual void onTick(TankMatch *match) override;
             virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
+            virtual void onDirectDraw(TankMatch *match, Console::BufferedConsole &console);
             virtual void onHit(TankMatch *match) override;
         };
 
@@ -594,8 +596,9 @@ namespace Hilltop {
 
         public:
             static const int BULLET_EVERY_TICKS = 1;
-            static const int CLOUD_WIDTH = 12;
-            static const int RAIN_TICKS = 50;
+            static const int CLOUD_WIDTH = 16;
+            static const int RAIN_TICKS = 32;
+            static constexpr float RAIN_DAMAGE = 0.55f;
 
             static std::shared_ptr<BulletRainCloud> create();
 
@@ -768,6 +771,24 @@ namespace Hilltop {
         };
 
 
+        class TracerWeapon : public Weapon {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Weapon>(*this);
+            }
+
+        public:
+            static const int TRACER_INTERVAL = 5;
+            static const int TRACER_OFFSET = TRACER_INTERVAL * 3;
+
+            TracerWeapon();
+
+            virtual void fire(TankMatch &match, int playerNumber) override;
+        };
+
+
 
         class TankController : public std::enable_shared_from_this<TankController> {
         private:
@@ -836,7 +857,6 @@ namespace Hilltop {
                 AIR = 0,
                 GRASS,
                 DIRT,
-                NOTHING,
                 NUM_LAND_TYPES,
             };
 

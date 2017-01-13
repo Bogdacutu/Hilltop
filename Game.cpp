@@ -183,13 +183,33 @@ std::shared_ptr<GroundTrailedRocket> Hilltop::Game::GroundTrailedRocket::create(
     return std::shared_ptr<GroundTrailedRocket>(new GroundTrailedRocket());
 }
 
+void Hilltop::Game::GroundTrailedRocket::onTick(TankMatch *match) {
+    SimpleTrailedRocket::onTick(match);
+
+    if (entityAge <= 10)
+        return;
+
+    Vector2 p = position.round();
+    for (int i = 0; i < match->players.size(); i++) {
+        if (match->players[i]->tank->alive) {
+            std::shared_ptr<Tank> tank = match->players[i]->tank;
+            if (distance(p, tank->getBarrelBase()) <= 6.0f) {
+                SimpleTrailedRocket::onHit(match);
+                break;
+            }
+        }
+    }
+}
+
 void Hilltop::Game::GroundTrailedRocket::onHit(TankMatch *match) {
     if (!hasHit) {
         hasHit = true;
         gravityMult = -1.0f;
         groundHog = true;
     } else {
-        SimpleTrailedRocket::onHit(match);
+        Vector2 p = position.round();
+        if (p.Y >= 0 && p.Y < match->width)
+            SimpleTrailedRocket::onHit(match);
     }
 }
 
@@ -407,9 +427,16 @@ void Hilltop::Game::Tracer::onTick(TankMatch *match) {
 void Hilltop::Game::Tracer::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
     Entity::onDraw(match, console);
 
-    if (hasHit) {
-        // TODO
-    }
+    Vector2 p = position.round();
+    console.set(p.X, p.Y, WHITE);
+}
+
+void Hilltop::Game::Tracer::onDirectDraw(TankMatch *match, Console::BufferedConsole &console) {
+    Entity::onDirectDraw(match, console);
+
+    Vector2 p = position.round();
+    int top = (p.X - 3) / 2;
+    printText(&console, top, p.Y - text.length() / 2, (int)text.length(), 1, text, WHITE, LEFT, false);
 }
 
 void Hilltop::Game::Tracer::onHit(TankMatch *match) {
@@ -602,15 +629,15 @@ void Hilltop::Game::Tank::onDraw(TankMatch *match, Console::DoublePixelBufferedC
         hpTop = p.X - 8;
 
     if (alive) {
-        int hp = scale(health, 0, maxHealth, 0, 9);
+        int hp = scale(health, 0, maxHealth, 0, 8);
         for (int i = 0; i < 9; i++)
             console.set(hpTop, p.Y - 2 + i, RED);
-        for (int i = 0; i < hp; i++)
+        for (int i = 0; i <= hp; i++)
             console.set(hpTop, p.Y - 2 + i, GREEN);
 
-        if (maxArmor > 0) {
-            int ap = scale(armor, 0, maxArmor, 0, 9);
-            for (int i = 0; i < ap; i++)
+        if (armor > 0) {
+            int ap = scale(armor, 0, maxArmor, 0, 8);
+            for (int i = 0; i <= ap; i++)
                 console.set(hpTop + 1, p.Y - 2 + i, BLUE);
         }
     }
@@ -700,7 +727,7 @@ Hilltop::Game::Drop::Drop() : Entity() {}
 
 int Hilltop::Game::Drop::getTopRow() {
     Vector2 p = position.round();
-    return ((int)p.X / 2) * 2 - 4;
+    return ((p.X - 5) / 2) * 2;
 }
 
 void Hilltop::Game::Drop::onTick(TankMatch *match) {
@@ -862,7 +889,7 @@ void Hilltop::Game::BulletRainCloud::onTick(TankMatch *match) {
         std::shared_ptr<SimpleTrailedRocket> rocket = SimpleTrailedRocket::create(YELLOW, DARK_GRAY, 1);
         rocket->position = Vector2(-10.0f, (float)pos);
         rocket->explosionSize = 3;
-        rocket->explosionDamage = 0.4f;
+        rocket->explosionDamage = RAIN_DAMAGE;
         match->addEntity(*rocket);
     }
 }
@@ -1003,6 +1030,27 @@ void Hilltop::Game::BulletRainWeapon::fire(TankMatch &match, int playerNumber) {
     cloud->position = tank->getProjectileBase();
     cloud->direction = tank->calcTrajectory();
     match.addEntity(*cloud);
+}
+
+
+
+//
+// TracerWeapon
+//
+
+Hilltop::Game::TracerWeapon::TracerWeapon() : Weapon() {}
+
+void Hilltop::Game::TracerWeapon::fire(TankMatch &match, int playerNumber) {
+    std::shared_ptr<Tank> tank = match.players[playerNumber]->tank;
+    for (int i = -TRACER_OFFSET; i <= TRACER_OFFSET; i += TRACER_INTERVAL) {
+        std::shared_ptr<Tracer> tracer = Tracer::create();
+        tracer->position = tank->getProjectileBase();
+        tracer->direction = Tank::calcTrajectory(tank->angle + i, tank->power);
+        std::ostringstream text;
+        text << i;
+        tracer->text = text.str();
+        match.addEntity(*tracer);
+    }
 }
 
 
@@ -1199,7 +1247,7 @@ bool Hilltop::Game::TankController::applyAI(TankMatch *match, TankController &pl
 //
 
 static const ConsoleColor LAND_COLORS[TankMatch::NUM_LAND_TYPES] =
-    { DARK_BLUE, DARK_GREEN, BROWN, BLACK };
+    { DARK_BLUE, DARK_GREEN, BROWN };
 
 bool Hilltop::Game::TankMatch::doEntityTick() {
     bool ret = false;
@@ -1313,6 +1361,12 @@ void Hilltop::Game::TankMatch::initalizeWeapons() {
         std::shared_ptr<BouncyRocketWeapon> weapon = std::make_shared<BouncyRocketWeapon>();
         weapon->name = "Bouncy Missile";
         weapon->explosionSize = 6;
+        weapons.push_back(weapon);
+    }
+
+    {
+        std::shared_ptr<TracerWeapon> weapon = std::make_shared<TracerWeapon>();
+        weapon->name = "Tracers";
         weapons.push_back(weapon);
     }
 
@@ -1527,12 +1581,13 @@ void Hilltop::Game::TankMatch::fire() {
 
         if (!found)
             for (int i = 0; i < players.size(); i++)
-                if (players[i]->team == players[currentPlayer]->team)
+                if (players[i]->team == players[currentPlayer]->team && players[i]->tank->alive)
                     fire(i);
     } else if (firingMode == FIRE_EVERYTHING) {
         if (currentPlayer == players.size() - 1)
             for (int i = 0; i < players.size(); i++)
-                fire(i);
+                if (players[i]->tank->alive)
+                    fire(i);
     }
 }
 

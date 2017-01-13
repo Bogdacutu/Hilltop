@@ -48,5 +48,6 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="console.reg" />
+    <None Include="README.md" />
   </ItemGroup>
 </Project>
