@@ -1,9 +1,13 @@
 #include "BufferedNativeConsole.h"
 
-using namespace Hilltop::Console;
 
+namespace Hilltop {
+namespace Console {
 
-Hilltop::Console::BufferedNativeConsole::BufferedNativeConsole(unsigned short width, unsigned short height)
+BufferedNativeConsole::BufferedNativeConsole(unsigned short width, unsigned short height)
     : BufferedConsole(width, height) {}
 
-void Hilltop::Console::BufferedNativeConsole::configure() {}
+void BufferedNativeConsole::configure() {}
+
+}
+}

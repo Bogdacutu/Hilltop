@@ -5,10 +5,11 @@
 #include <sstream>
 #include <vector>
 
-using namespace Hilltop::Console;
 
+namespace Hilltop {
+namespace Console {
 
-TextBoxSize Hilltop::Console::printText(BufferedConsole *buffer, unsigned short x, unsigned short y,
+TextBoxSize printText(BufferedConsole *buffer, unsigned short x, unsigned short y,
     unsigned short width, unsigned short height, std::string text, ConsoleColor color, TextAlignment align,
     bool wordWrap) {
     std::istringstream input(text);
@@ -80,4 +81,7 @@ TextBoxSize Hilltop::Console::printText(BufferedConsole *buffer, unsigned short 
     for (int i = 0; i < lines.size(); i++)
         ret.cols = std::max(ret.cols, (unsigned short)lines[i].length());
     return ret;
+}
+
+}
 }

@@ -109,6 +109,9 @@ BOOST_CLASS_EXPORT(Hilltop::Game::BulletRainWeapon)
 #include "Game/MinigunWeapon.h"
 BOOST_CLASS_EXPORT(Hilltop::Game::MinigunWeapon)
 
+#include "Game/TracerWeapon.h"
+BOOST_CLASS_EXPORT(Hilltop::Game::TracerWeapon)
+
 
 #define GAME_TICKS_PER_SEC 20
 #define GAME_TICK_MS (1000 / GAME_TICKS_PER_SEC)

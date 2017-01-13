@@ -1,14 +1,22 @@
 #include "Game/Explosion.h"
 #include "Game/TankController.h"
 #include "Game/TankMatch.h"
+#include "resource.h"
+#include <Windows.h>
 
 
 namespace Hilltop {
 namespace Game {
 
+static void playSound() {
+    PlaySound(MAKEINTRESOURCE(IDR_WAVE1), GetModuleHandle(nullptr), SND_RESOURCE | SND_ASYNC);
+}
+
 Explosion::Explosion(int size) : Entity(), size(size) {
     gravityMult = 0.0f;
     coreSize = size - 1;
+
+    playSound();
 }
 
 void Explosion::destroyLand(TankMatch *match) {

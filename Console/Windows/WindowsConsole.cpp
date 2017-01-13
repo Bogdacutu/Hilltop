@@ -1,8 +1,9 @@
 #include "Console/Windows/WindowsConsole.h"
 #include <algorithm>
 
-using namespace Hilltop::Console;
 
+namespace Hilltop {
+namespace Console {
 
 static unsigned short getConsoleFontSize(HANDLE buffer) {
     CONSOLE_FONT_INFOEX info = { sizeof(info) };
@@ -82,7 +83,7 @@ static void setGameBufferProps(HANDLE buffer) {
 }
 
 
-void Hilltop::Console::initWindowsColors() {
+void initWindowsColors() {
     // http://www.romanzolotarev.com/pico-8-color-palette/
     colors[BLACK] = RGB(0, 0, 0);
     colors[DARK_BLUE] = RGB(29, 43, 83);
@@ -102,35 +103,34 @@ void Hilltop::Console::initWindowsColors() {
     colors[PEACH] = RGB(255, 204, 170);
 }
 
-COLORREF Hilltop::Console::mapWindowsColor(ConsoleColor color) {
+COLORREF mapWindowsColor(ConsoleColor color) {
     return colors[color];
 }
 
 
-Hilltop::Console::WindowsConsole::WindowsConsole(HANDLE handle, unsigned short width,
+WindowsConsole::WindowsConsole(HANDLE handle, unsigned short width,
     unsigned short height, unsigned short minFont, unsigned short maxFont)
     : BufferedNativeConsole(width, height), handle(handle), minFont(minFont), maxFont(maxFont) {
     configure();
 }
 
-void Hilltop::Console::WindowsConsole::configure() {
-    if (chosenSize > 0) {
-        if (getConsoleFontSize(handle) != chosenSize)
-            setConsoleFontSize(handle, chosenSize);
-        setConsoleSize(handle, width, height);
-    } else {
+void WindowsConsole::configure() {
+    if (chosenSize <= 0) {
         setGameBufferProps(handle);
         chosenSize = resizeWithAutoFont(handle, width, height, minFont, maxFont);
     }
+    if (getConsoleFontSize(handle) != chosenSize)
+        setConsoleFontSize(handle, chosenSize);
+    setConsoleSize(handle, width, height);
     centerConsoleWindow();
 }
 
-std::shared_ptr<WindowsConsole> Hilltop::Console::WindowsConsole::create(HANDLE handle, unsigned short width,
+std::shared_ptr<WindowsConsole> WindowsConsole::create(HANDLE handle, unsigned short width,
     unsigned short height, unsigned short minFont, unsigned short maxFont) {
     return std::shared_ptr<WindowsConsole>(new WindowsConsole(handle, width, height, minFont, maxFont));
 }
 
-BufferedConsole::pixel_t Hilltop::Console::WindowsConsole::get(unsigned short x, unsigned short y) const {
+BufferedConsole::pixel_t WindowsConsole::get(unsigned short x, unsigned short y) const {
     if (x >= height || y >= width)
         return pixel_t();
 
@@ -141,7 +141,7 @@ BufferedConsole::pixel_t Hilltop::Console::WindowsConsole::get(unsigned short x,
     return ret;
 }
 
-void Hilltop::Console::WindowsConsole::set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color,
+void WindowsConsole::set(unsigned short x, unsigned short y, wchar_t ch, ConsoleColor color,
     ConsoleColorType colorMask) {
     if (x >= height || y >= width)
         return;
@@ -151,8 +151,11 @@ void Hilltop::Console::WindowsConsole::set(unsigned short x, unsigned short y, w
     buffer[idx].Attributes = calc_masked_color((ConsoleColor)buffer[idx].Attributes, color, colorMask);
 }
 
-void Hilltop::Console::WindowsConsole::commit() const {
+void WindowsConsole::commit() const {
     SMALL_RECT area = { 0, 0, (SHORT)width, (SHORT)height };
     if (!WriteConsoleOutput(GetStdHandle(STD_OUTPUT_HANDLE), &buffer[0], { (SHORT)width, (SHORT)height }, { 0, 0 }, &area))
         abort();
+}
+
+}
 }

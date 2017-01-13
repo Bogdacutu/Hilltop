@@ -1,7 +1,8 @@
 ﻿#include "DoublePixelBufferedConsole.h"
 
-using namespace Hilltop::Console;
 
+namespace Hilltop {
+namespace Console {
 
 const uint8_t Hilltop::Console::DoublePixelBufferedConsole::BIT_MASKS[2] = { 0xf0, 0xf };
 const int Hilltop::Console::DoublePixelBufferedConsole::BIT_SHIFTS[2] = { 4, 0 };
@@ -45,4 +46,7 @@ void Hilltop::Console::DoublePixelBufferedConsole::commit(Console &buffer) const
             buffer.set(i, j, c, make_color(x, y));
         }
     }
+}
+
+}
 }

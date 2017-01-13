@@ -23,7 +23,7 @@ void GroundTrailedRocket::onTick(TankMatch *match) {
     for (int i = 0; i < match->players.size(); i++) {
         if (match->players[i]->tank->alive) {
             std::shared_ptr<Tank> tank = match->players[i]->tank;
-            if (distance(p, tank->getBarrelBase()) <= 6.0f) {
+            if (distance(p, tank->getBarrelBase()) <= 5.0f) {
                 SimpleTrailedRocket::onHit(match);
                 break;
             }

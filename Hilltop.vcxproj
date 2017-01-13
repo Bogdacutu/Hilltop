@@ -243,6 +243,7 @@
     <ClInclude Include="Game\Vector2.h" />
     <ClInclude Include="Game\Weapon.h" />
     <ClInclude Include="Game\WeaponDrop.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="UI\Button.h" />
     <ClInclude Include="UI\Element.h" />
     <ClInclude Include="UI\ElementCollection.h" />
@@ -254,6 +255,12 @@
     <None Include="console.reg" />
     <None Include="packages.config" />
     <None Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Hilltop.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Media Include="explosion.wav" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
