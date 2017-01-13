@@ -176,9 +176,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="UI.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Console\ConsoleColor.h">
       <Filter>Console</Filter>
     </ClInclude>
@@ -205,12 +202,6 @@
     </ClInclude>
     <ClInclude Include="Console\Windows\WindowsConsole.h">
       <Filter>Console\Windows</Filter>
-    </ClInclude>
-    <ClInclude Include="Console.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Console.Windows.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="UI\Element.h">
       <Filter>UI</Filter>

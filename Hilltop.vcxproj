@@ -204,8 +204,6 @@
     <ClCompile Include="UI\TextBox.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Console.h" />
-    <ClInclude Include="Console.Windows.h" />
     <ClInclude Include="Console\BufferedConsole.h" />
     <ClInclude Include="Console\BufferedConsoleRegion.h" />
     <ClInclude Include="Console\BufferedNativeConsole.h" />
@@ -245,7 +243,6 @@
     <ClInclude Include="Game\Vector2.h" />
     <ClInclude Include="Game\Weapon.h" />
     <ClInclude Include="Game\WeaponDrop.h" />
-    <ClInclude Include="UI.h" />
     <ClInclude Include="UI\Button.h" />
     <ClInclude Include="UI\Element.h" />
     <ClInclude Include="UI\ElementCollection.h" />
