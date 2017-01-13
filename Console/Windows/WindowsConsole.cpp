@@ -1,9 +1,7 @@
-#include "Console.h"
-#include <Windows.h>
-#include "Console.Windows.h"
+#include "Console/Windows/WindowsConsole.h"
+#include <algorithm>
 
 using namespace Hilltop::Console;
-
 
 
 static unsigned short getConsoleFontSize(HANDLE buffer) {
@@ -23,7 +21,8 @@ static void setConsoleFontSize(HANDLE buffer, unsigned short size) {
 static void setConsoleSize(HANDLE buffer, unsigned short width, unsigned short height) {
     CONSOLE_SCREEN_BUFFER_INFO info;
     GetConsoleScreenBufferInfo(buffer, &info);
-    SetConsoleScreenBufferSize(buffer, { max(info.dwSize.X, width), max(info.dwSize.Y, height) });
+    SetConsoleScreenBufferSize(buffer, { std::max(info.dwSize.X, (SHORT)width),
+        std::max(info.dwSize.Y, (SHORT)height) });
     SMALL_RECT finalArea = { 0, 0, (SHORT)width - 1, (SHORT)height - 1 };
     SetConsoleWindowInfo(buffer, TRUE, &finalArea);
     SetConsoleScreenBufferSize(buffer, { (SHORT)width, (SHORT)height });
@@ -52,7 +51,8 @@ static void centerConsoleWindow() {
     centerWindow(GetConsoleWindow());
 }
 
-static unsigned short resizeWithAutoFont(HANDLE buffer, unsigned short width, unsigned short height, unsigned short minFont, unsigned short maxFont) {
+static unsigned short resizeWithAutoFont(HANDLE buffer, unsigned short width, unsigned short height,
+    unsigned short minFont, unsigned short maxFont) {
     unsigned short w = 0, h = 0;
     for (unsigned short i = maxFont; i >= minFont; i--) {
         setConsoleFontSize(buffer, i);
@@ -106,11 +106,6 @@ COLORREF Hilltop::Console::mapWindowsColor(ConsoleColor color) {
     return colors[color];
 }
 
-
-
-//
-// WindowsConsole
-//
 
 Hilltop::Console::WindowsConsole::WindowsConsole(HANDLE handle, unsigned short width,
     unsigned short height, unsigned short minFont, unsigned short maxFont)

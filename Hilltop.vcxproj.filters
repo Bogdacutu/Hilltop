@@ -13,15 +13,15 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Console">
+      <UniqueIdentifier>{d624df6b-6803-4ea7-b146-c8ae2c2d5818}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Console\Windows">
+      <UniqueIdentifier>{a9ebd995-1859-499b-8a40-d06f1faba177}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Console.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Console.Windows.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Game.cpp">
@@ -30,18 +30,72 @@
     <ClCompile Include="UI.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Console\ConsoleColor.cpp">
+      <Filter>Console</Filter>
+    </ClCompile>
+    <ClCompile Include="Console\Console.cpp">
+      <Filter>Console</Filter>
+    </ClCompile>
+    <ClCompile Include="Console\BufferedConsole.cpp">
+      <Filter>Console</Filter>
+    </ClCompile>
+    <ClCompile Include="Console\BufferedNativeConsole.cpp">
+      <Filter>Console</Filter>
+    </ClCompile>
+    <ClCompile Include="Console\BufferedConsoleRegion.cpp">
+      <Filter>Console</Filter>
+    </ClCompile>
+    <ClCompile Include="Console\SnapshotConsole.cpp">
+      <Filter>Console</Filter>
+    </ClCompile>
+    <ClCompile Include="Console\DoublePixelBufferedConsole.cpp">
+      <Filter>Console</Filter>
+    </ClCompile>
+    <ClCompile Include="Console\Text.cpp">
+      <Filter>Console</Filter>
+    </ClCompile>
+    <ClCompile Include="Console\Windows\WindowsConsole.cpp">
+      <Filter>Console\Windows</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Console.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Console.Windows.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Game.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Console\ConsoleColor.h">
+      <Filter>Console</Filter>
+    </ClInclude>
+    <ClInclude Include="Console\Console.h">
+      <Filter>Console</Filter>
+    </ClInclude>
+    <ClInclude Include="Console\BufferedConsole.h">
+      <Filter>Console</Filter>
+    </ClInclude>
+    <ClInclude Include="Console\BufferedNativeConsole.h">
+      <Filter>Console</Filter>
+    </ClInclude>
+    <ClInclude Include="Console\BufferedConsoleRegion.h">
+      <Filter>Console</Filter>
+    </ClInclude>
+    <ClInclude Include="Console\SnapshotConsole.h">
+      <Filter>Console</Filter>
+    </ClInclude>
+    <ClInclude Include="Console\DoublePixelBufferedConsole.h">
+      <Filter>Console</Filter>
+    </ClInclude>
+    <ClInclude Include="Console\Text.h">
+      <Filter>Console</Filter>
+    </ClInclude>
+    <ClInclude Include="Console\Windows\WindowsConsole.h">
+      <Filter>Console\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="Console.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Console.Windows.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
