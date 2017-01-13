@@ -154,10 +154,10 @@ std::shared_ptr<SimpleTrailedRocket> Hilltop::Game::SimpleTrailedRocket::create(
 void Hilltop::Game::SimpleTrailedRocket::onTick(TankMatch *match) {
     SimpleRocket::onTick(match);
 
-    if (!hasHit) {
+    if (!hasHit || groundHog) {
         Vector2 from = position - match->gravity * gravityMult;
         Vector2 to = from + direction;
-        to = match->checkForHit(position, to).second.round();
+        to = match->checkForHit(position, to, groundHog).second.round();
         foreachPixel(from, to, [this, match, to](Vector2 p)->bool {
             if (p.round() == to)
                 return true;
@@ -167,6 +167,28 @@ void Hilltop::Game::SimpleTrailedRocket::onTick(TankMatch *match) {
             match->addEntity(*trail);
             return false;
         });
+    }
+}
+
+
+
+//
+// GroundTrailedRocket
+//
+
+Hilltop::Game::GroundTrailedRocket::GroundTrailedRocket() : SimpleTrailedRocket(WHITE, DARK_GRAY, 3) {}
+
+std::shared_ptr<GroundTrailedRocket> Hilltop::Game::GroundTrailedRocket::create() {
+    return std::shared_ptr<GroundTrailedRocket>(new GroundTrailedRocket());
+}
+
+void Hilltop::Game::GroundTrailedRocket::onHit(TankMatch *match) {
+    if (!hasHit) {
+        hasHit = true;
+        gravityMult = -1.0f;
+        groundHog = true;
+    } else {
+        SimpleTrailedRocket::onHit(match);
     }
 }
 
@@ -884,6 +906,22 @@ Hilltop::Game::DirtRocketWeapon::DirtRocketWeapon(int numRockets) : RocketWeapon
 
 
 //
+// GroundRocketWeapon
+//
+
+std::shared_ptr<Entity> Hilltop::Game::GroundRocketWeapon::createRocket(Vector2 position,
+    Vector2 direction) {
+    std::shared_ptr<GroundTrailedRocket> rocket = GroundTrailedRocket::create();
+    rocket->position = position;
+    rocket->direction = direction;
+    return rocket;
+}
+
+Hilltop::Game::GroundRocketWeapon::GroundRocketWeapon(int numRockets) : RocketWeapon(numRockets) {}
+
+
+
+//
 // BouncyRocketWeapon
 //
 
@@ -1208,6 +1246,12 @@ void Hilltop::Game::TankMatch::initalizeWeapons() {
     {
         std::shared_ptr<DirtRocketWeapon> weapon = std::make_shared<DirtRocketWeapon>(1);
         weapon->name = "Dirt Missile";
+        weapons.push_back(weapon);
+    }
+
+    {
+        std::shared_ptr<GroundRocketWeapon> weapon = std::make_shared<GroundRocketWeapon>(1);
+        weapon->name = "Ground Missile";
         weapons.push_back(weapon);
     }
 
