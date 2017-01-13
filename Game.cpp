@@ -135,6 +135,7 @@ void Hilltop::Game::SimpleRocket::onHit(TankMatch *match) {
     ex->position = position;
     ex->willDestroyLand = destroyLand;
     ex->willCreateLand = createLand;
+    ex->damageMult = explosionDamage;
     match->addEntity(*ex);
 }
 
@@ -254,7 +255,6 @@ void Hilltop::Game::BouncyTrailedRocket::onHit(TankMatch *match) {
 
 void Hilltop::Game::BouncyTrailedRocket::finish(TankMatch *match) {
     SimpleTrailedRocket::onHit(match);
-    match->removeEntity(*this);
 }
 
 
@@ -308,7 +308,7 @@ void Hilltop::Game::Explosion::createLand(TankMatch *match) {
 }
 
 int Hilltop::Game::Explosion::calcDamage(Vector2 point) {
-    return scale(distance(position.round(), point), 0, size, 8 * size, 1) * damageMult;
+    return std::max<int>(1, scale(distance(position.round(), point), 0, size, 8 * size, 1) * damageMult);
 }
 
 void Hilltop::Game::Explosion::hitTanks(TankMatch *match) {
@@ -823,6 +823,15 @@ void Hilltop::Game::ParticleBomb::onTick(TankMatch *match) {
             std::shared_ptr<Tank> tank = match->players[i]->tank;
             if (std::abs(position.X - tank->getBarrelBase().X) < TRIGGER_DISTANCE_X &&
                 std::abs(position.Y - tank->getBarrelBase().Y) < TRIGGER_DISTANCE_Y) {
+                for (int i = 0; i < STEPS; i++) {
+                    int angle = 360 / STEPS * i;
+                    std::shared_ptr<SimpleTrailedRocket> rocket = SimpleTrailedRocket::create(WHITE, DARK_GRAY, 3);
+                    rocket->position = position.round();
+                    rocket->direction = Tank::calcTrajectory(angle, 10);
+                    rocket->explosionSize = 3;
+                    rocket->explosionDamage = 0.6f;
+                    match->addEntity(*rocket);
+                }
                 onHit(match);
                 break;
             }
@@ -830,19 +839,47 @@ void Hilltop::Game::ParticleBomb::onTick(TankMatch *match) {
     }
 }
 
-void Hilltop::Game::ParticleBomb::onHit(TankMatch *match) {
-    SimpleTrailedRocket::onHit(match);
 
-    for (int i = 0; i < STEPS; i++) {
-        int angle = 360 / STEPS * i;
-        std::shared_ptr<SimpleTrailedRocket> rocket = SimpleTrailedRocket::create(WHITE, DARK_GRAY, 3);
-        rocket->position = position.round();
-        rocket->direction = Tank::calcTrajectory(angle, 10);
+
+//
+// BulletRainCloud
+//
+
+Hilltop::Game::BulletRainCloud::BulletRainCloud() : Entity() {}
+
+std::shared_ptr<BulletRainCloud> Hilltop::Game::BulletRainCloud::create() {
+    return std::shared_ptr<BulletRainCloud>(new BulletRainCloud());
+}
+
+void Hilltop::Game::BulletRainCloud::onTick(TankMatch *match) {
+    Entity::onTick(match);
+
+    if (hasHit && entityAge % BULLET_EVERY_TICKS == 0) {
+        Vector2 p = position.round();
+        int left = p.Y - CLOUD_WIDTH / 2;
+        int right = p.Y + CLOUD_WIDTH / 2;
+        int pos = scale(rand(), 0, RAND_MAX, left, right);
+        std::shared_ptr<SimpleTrailedRocket> rocket = SimpleTrailedRocket::create(YELLOW, DARK_GRAY, 1);
+        rocket->position = Vector2(-10.0f, (float)pos);
         rocket->explosionSize = 3;
-        rocket->explosionDamage = 0.1f;
+        rocket->explosionDamage = 0.4f;
         match->addEntity(*rocket);
     }
-    match->removeEntity(*this);
+}
+
+void Hilltop::Game::BulletRainCloud::onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) {
+    Entity::onDraw(match, console);
+
+    Vector2 p = position.round();
+    if (!hasHit)
+        console.set(p.X, p.Y, YELLOW);
+}
+
+void Hilltop::Game::BulletRainCloud::onHit(TankMatch *match) {
+    if (!hasHit)
+        maxEntityAge = entityAge + RAIN_TICKS;
+
+    Entity::onHit(match);
 }
 
 
@@ -950,6 +987,22 @@ void Hilltop::Game::ParticleBombWeapon::fire(TankMatch &match, int playerNumber)
     bomb->direction = tank->calcTrajectory();
     bomb->team = match.players[playerNumber]->team;
     match.addEntity(*bomb);
+}
+
+
+
+//
+// BulletRainWeapon
+//
+
+Hilltop::Game::BulletRainWeapon::BulletRainWeapon() : Weapon() {}
+
+void Hilltop::Game::BulletRainWeapon::fire(TankMatch &match, int playerNumber) {
+    std::shared_ptr<Tank> tank = match.players[playerNumber]->tank;
+    std::shared_ptr<BulletRainCloud> cloud = BulletRainCloud::create();
+    cloud->position = tank->getProjectileBase();
+    cloud->direction = tank->calcTrajectory();
+    match.addEntity(*cloud);
 }
 
 
@@ -1246,6 +1299,7 @@ void Hilltop::Game::TankMatch::initalizeWeapons() {
     {
         std::shared_ptr<DirtRocketWeapon> weapon = std::make_shared<DirtRocketWeapon>(1);
         weapon->name = "Dirt Missile";
+        weapon->explosionSize = 6;
         weapons.push_back(weapon);
     }
 
@@ -1265,6 +1319,12 @@ void Hilltop::Game::TankMatch::initalizeWeapons() {
     {
         std::shared_ptr<ParticleBombWeapon> weapon = std::make_shared<ParticleBombWeapon>();
         weapon->name = "Particle Bomb";
+        weapons.push_back(weapon);
+    }
+
+    {
+        std::shared_ptr<BulletRainWeapon> weapon = std::make_shared<BulletRainWeapon>();
+        weapon->name = "Bullet Rain";
         weapons.push_back(weapon);
     }
 

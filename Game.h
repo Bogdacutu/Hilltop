@@ -578,6 +578,29 @@ namespace Hilltop {
             int team = -1;
 
             virtual void onTick(TankMatch *match) override;
+        };
+
+
+        class BulletRainCloud : public Entity {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serializa(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Entity>(*this);
+            }
+
+        protected:
+            BulletRainCloud();
+
+        public:
+            static const int BULLET_EVERY_TICKS = 1;
+            static const int CLOUD_WIDTH = 12;
+            static const int RAIN_TICKS = 50;
+
+            static std::shared_ptr<BulletRainCloud> create();
+
+            virtual void onTick(TankMatch *match) override;
+            virtual void onDraw(TankMatch *match, Console::DoublePixelBufferedConsole &console) override;
             virtual void onHit(TankMatch *match) override;
         };
 
@@ -725,6 +748,21 @@ namespace Hilltop {
 
         public:
             ParticleBombWeapon();
+
+            virtual void fire(TankMatch &match, int playerNumber) override;
+        };
+
+
+        class BulletRainWeapon : public Weapon {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Weapon>(*this);
+            }
+
+        public:
+            BulletRainWeapon();
 
             virtual void fire(TankMatch &match, int playerNumber) override;
         };

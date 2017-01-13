@@ -37,6 +37,7 @@ BOOST_CLASS_EXPORT(Hilltop::Game::HealthDrop)
 BOOST_CLASS_EXPORT(Hilltop::Game::ArmorDrop)
 BOOST_CLASS_EXPORT(Hilltop::Game::WeaponDrop)
 BOOST_CLASS_EXPORT(Hilltop::Game::ParticleBomb)
+BOOST_CLASS_EXPORT(Hilltop::Game::BulletRainCloud)
 
 BOOST_CLASS_EXPORT(Hilltop::Game::Weapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::RocketWeapon)
@@ -44,6 +45,7 @@ BOOST_CLASS_EXPORT(Hilltop::Game::DirtRocketWeapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::GroundRocketWeapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::BouncyRocketWeapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::ParticleBombWeapon)
+BOOST_CLASS_EXPORT(Hilltop::Game::BulletRainWeapon)
 
 
 #define GAME_TICKS_PER_SEC 20
@@ -1586,7 +1588,7 @@ static bool startGameAction(Form::event_args_t e) {
 
 static void newGameMenu() {
     std::shared_ptr<ElementCollection> newGameMenu = ElementCollection::create();
-    newGameMenu->width = MENU_WIDTH / 2 - 5;
+    newGameMenu->width = MENU_WIDTH / 2 - 4;
     newGameMenu->height = MENU_HEIGHT - 12;
     newGameMenu->x = 10;
     newGameMenu->y = 5;
