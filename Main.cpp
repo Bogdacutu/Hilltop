@@ -25,6 +25,7 @@ BOOST_CLASS_EXPORT(Hilltop::Game::Entity)
 BOOST_CLASS_EXPORT(Hilltop::Game::BotAttempt)
 BOOST_CLASS_EXPORT(Hilltop::Game::SimpleRocket)
 BOOST_CLASS_EXPORT(Hilltop::Game::SimpleTrailedRocket)
+BOOST_CLASS_EXPORT(Hilltop::Game::BouncyTrailedRocket)
 BOOST_CLASS_EXPORT(Hilltop::Game::RocketTrail)
 BOOST_CLASS_EXPORT(Hilltop::Game::Explosion)
 BOOST_CLASS_EXPORT(Hilltop::Game::Tracer)
@@ -39,6 +40,7 @@ BOOST_CLASS_EXPORT(Hilltop::Game::ParticleBomb)
 BOOST_CLASS_EXPORT(Hilltop::Game::Weapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::RocketWeapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::DirtRocketWeapon)
+BOOST_CLASS_EXPORT(Hilltop::Game::BouncyRocketWeapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::ParticleBombWeapon)
 
 
@@ -55,7 +57,7 @@ const unsigned short MENU_HEIGHT = 25;
 std::shared_ptr<BufferedConsole> console;
 
 
-const int START_WEAPONS = 10;
+const int START_WEAPONS = 6;
 const int MIN_WEAPONS = 2;
 
 
@@ -1113,6 +1115,19 @@ enum NewGameArea {
     NUM_NEW_GAME_AREAS
 };
 
+enum BotDifficulty {
+    BOT_EASY = 0,
+    BOT_MEDIUM,
+    BOT_HARD,
+    NUM_BOT_DIFFICULTIES
+};
+
+const char *BOT_DIFFICULTY_NAMES[] = {
+    "Easy",
+    "Medium",
+    "Hard"
+};
+
 enum PlayerTeam {
     TEAM_RED = 1,
     TEAM_BLUE = 2,
@@ -1170,6 +1185,7 @@ struct {
     struct {
         bool enabled = false;
         bool human = false;
+        BotDifficulty difficulty = BOT_MEDIUM;
         int team;
         int tank[NUM_TANK_ATTRIBUTES];
     } players[4];
@@ -1461,7 +1477,8 @@ static void updateNewGameMenu() {
         ConsoleColor color = BLACK;
         if (newGameSettings.players[i].enabled) {
             color = WHITE;
-            type = newGameSettings.players[i].human ? "Human" : "Bot";
+            type = newGameSettings.players[i].human ? "Human" :
+                BOT_DIFFICULTY_NAMES[newGameSettings.players[i].difficulty];
         }
 
         playerText[i]->color = newGameSettings.players[i].enabled ? WHITE : GRAY;
@@ -1541,6 +1558,7 @@ static bool startGameAction(Form::event_args_t e) {
                 std::shared_ptr<TankController> controller = TankController::create();
                 controller->tank = tank;
                 controller->isHuman = newGameSettings.players[i].human;
+                controller->botDifficulty = newGameSettings.players[i].difficulty;
                 controller->team = newGameSettings.players[i].team;
                 controller->movesPerTurn = 5 + 5 * newGameSettings.players[i].tank[TANK_STAMINA];
                 controller->movesLeft = controller->movesPerTurn;
@@ -1585,20 +1603,10 @@ static void newGameMenu() {
         newGameMenu->addChild(*playerText[i]);
 
         playerType[i] = TextBox::create();
-        playerType[i]->width = 5;
+        playerType[i]->width = 6;
         playerType[i]->height = 1;
         playerType[i]->x = i * 2 + 1;
         playerType[i]->y = playerText[i]->y + playerText[i]->width + 5;
-        if (i == 0)
-            playerType[i]->text = "Human";
-        else if (i == 1)
-            playerType[i]->text = "Bot";
-        else
-            playerType[i]->text = "Empty";
-        if (i <= 1)
-            playerType[i]->color = WHITE;
-        else
-            playerType[i]->color = DARK_GRAY;
         playerType[i]->alignment = CENTER;
         newGameMenu->addChild(*playerType[i]);
 
@@ -1607,7 +1615,6 @@ static void newGameMenu() {
         playerTeam[i]->height = 1;
         playerTeam[i]->x = i * 2 + 1;
         playerTeam[i]->y = playerType[i]->y + playerType[i]->width + 5;
-        playerTeam[i]->text = "Green";
         playerTeam[i]->alignment = CENTER;
         newGameMenu->addChild(*playerTeam[i]);
 
@@ -1647,9 +1654,15 @@ static void newGameMenu() {
         newGameForm->actions[i * NUM_PLAYER_NEW_GAME_AREAS + TANK_TYPE_OPTION] = [](Form::event_args_t e)->bool {
             const int idx = e.position / NUM_PLAYER_NEW_GAME_AREAS;
             if (newGameSettings.players[idx].enabled) {
-                newGameSettings.players[idx].human = !newGameSettings.players[idx].human;
-                if (newGameSettings.players[idx].human)
-                    newGameSettings.players[idx].enabled = false;
+                if (newGameSettings.players[idx].human) {
+                    newGameSettings.players[idx].human = false;
+                    newGameSettings.players[idx].difficulty = BOT_EASY;
+                } else {
+                    newGameSettings.players[idx].difficulty = (BotDifficulty)
+                        ((newGameSettings.players[idx].difficulty + 1) % NUM_BOT_DIFFICULTIES);
+                    if (newGameSettings.players[idx].difficulty == BOT_EASY)
+                        newGameSettings.players[idx].enabled = false;
+                }
             } else {
                 newGameSettings.players[idx].enabled = true;
                 newGameSettings.players[idx].human = true;

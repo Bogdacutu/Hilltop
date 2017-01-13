@@ -173,6 +173,71 @@ void Hilltop::Game::SimpleTrailedRocket::onTick(TankMatch *match) {
 
 
 //
+// BouncyTrailedRocket
+//
+
+Hilltop::Game::BouncyTrailedRocket::BouncyTrailedRocket() : SimpleTrailedRocket(BLUE, DARK_GRAY, 2) {}
+
+std::shared_ptr<BouncyTrailedRocket> Hilltop::Game::BouncyTrailedRocket::create() {
+    return std::shared_ptr<BouncyTrailedRocket>(new BouncyTrailedRocket());
+}
+
+void Hilltop::Game::BouncyTrailedRocket::onHit(TankMatch *match) {
+    Vector2 d = direction;
+
+    Entity::onHit(match);
+
+    Vector2 p = position.round();
+    Vector2 air;
+    bool foundAir = false;
+    for (int i = -1; i <= 1; i++) {
+        for (int j = -1; j <= 1; j++) {
+            if (match->get(p.X + i, p.Y + j) == TankMatch::AIR) {
+                Vector2 a = Vector2(i, j);
+                if (!foundAir) {
+                    foundAir = true;
+                    air = a;
+                } else if (distance(p, p + air) > distance(p, p + a)) {
+                    air = a;
+                    break;
+                }
+            }
+        }
+    }
+
+    bool foundTank = false;
+    for (int i = 0; i < match->players.size(); i++) {
+        if (match->players[i]->tank->alive) {
+            std::shared_ptr<Tank> tank = match->players[i]->tank;
+            if (distance(p, tank->getBarrelBase()) <= 6.0f) {
+                foundTank = true;
+                break;
+            }
+        }
+    }
+
+    bouncesLeft--;
+    if (bouncesLeft <= 0 || !foundAir || foundTank) {
+        finish(match);
+    } else {
+        hasHit = false;
+        if ((air.X < 0.0f && d.X > 0.0f) || (air.X > 0.0f && d.X < 0.0f))
+            d.X *= -1.0f;
+        if ((air.Y < 0.0f && d.Y > 0.0f) || (air.Y > 0.0f && d.Y < 0.0f))
+            d.Y *= -1.0f;
+        direction = d;
+        position = position + air;
+    }
+}
+
+void Hilltop::Game::BouncyTrailedRocket::finish(TankMatch *match) {
+    SimpleTrailedRocket::onHit(match);
+    match->removeEntity(*this);
+}
+
+
+
+//
 // RocketTrail
 //
 
@@ -732,7 +797,7 @@ void Hilltop::Game::ParticleBomb::onTick(TankMatch *match) {
     SimpleTrailedRocket::onTick(match);
 
     for (int i = 0; i < match->players.size(); i++) {
-        if (match->players[i]->team != team) {
+        if (match->players[i]->team != team && match->players[i]->tank->alive) {
             std::shared_ptr<Tank> tank = match->players[i]->tank;
             if (std::abs(position.X - tank->getBarrelBase().X) < TRIGGER_DISTANCE_X &&
                 std::abs(position.Y - tank->getBarrelBase().Y) < TRIGGER_DISTANCE_Y) {
@@ -752,7 +817,7 @@ void Hilltop::Game::ParticleBomb::onHit(TankMatch *match) {
         rocket->position = position.round();
         rocket->direction = Tank::calcTrajectory(angle, 10);
         rocket->explosionSize = 3;
-        rocket->explosionDamage = 0.15f;
+        rocket->explosionDamage = 0.1f;
         match->addEntity(*rocket);
     }
     match->removeEntity(*this);
@@ -815,6 +880,22 @@ std::shared_ptr<Entity> Hilltop::Game::DirtRocketWeapon::createRocket(Vector2 po
 }
 
 Hilltop::Game::DirtRocketWeapon::DirtRocketWeapon(int numRockets) : RocketWeapon(numRockets) {}
+
+
+
+//
+// BouncyRocketWeapon
+//
+
+std::shared_ptr<Entity> Hilltop::Game::BouncyRocketWeapon::createRocket(Vector2 position,
+    Vector2 direction) {
+    std::shared_ptr<BouncyTrailedRocket> rocket = BouncyTrailedRocket::create();
+    rocket->position = position;
+    rocket->direction = direction;
+    return rocket;
+}
+
+Hilltop::Game::BouncyRocketWeapon::BouncyRocketWeapon() : RocketWeapon(1) {}
 
 
 
@@ -926,7 +1007,7 @@ bool Hilltop::Game::TankController::applyAI(TankMatch *match, TankController &pl
                 }
             }
 
-            for (int i = 0; i < RANDOM_ATTEMPTS_BY_BOT_DIFFICULTY[2]; i++) {
+            for (int i = 0; i < RANDOM_ATTEMPTS_BY_BOT_DIFFICULTY[player.botDifficulty]; i++) {
                 int angle = scale(rand(), 0, RAND_MAX, 0, 180);
                 int power = scale(rand(), 0, RAND_MAX, 0, 100);
 
@@ -1127,6 +1208,13 @@ void Hilltop::Game::TankMatch::initalizeWeapons() {
     {
         std::shared_ptr<DirtRocketWeapon> weapon = std::make_shared<DirtRocketWeapon>(1);
         weapon->name = "Dirt Missile";
+        weapons.push_back(weapon);
+    }
+
+    {
+        std::shared_ptr<BouncyRocketWeapon> weapon = std::make_shared<BouncyRocketWeapon>();
+        weapon->name = "Bouncy Missile";
+        weapon->explosionSize = 6;
         weapons.push_back(weapon);
     }
 

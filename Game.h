@@ -45,6 +45,10 @@ namespace Hilltop {
                 return Vector2(X - other.X, Y - other.Y);
             }
 
+            Vector2 operator-() const {
+                return Vector2(-X, -Y);
+            }
+
             Vector2 operator*(float other) const {
                 return Vector2(X * other, Y * other);
             }
@@ -220,6 +224,31 @@ namespace Hilltop {
         inline void load_construct_data(Archive &ar, SimpleTrailedRocket *t, const unsigned int) {
             ::new(t) SimpleTrailedRocket(ConsoleColor(), ConsoleColor(), 0);
         }
+
+
+        class BouncyTrailedRocket : public SimpleTrailedRocket {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<SimpleTrailedRocket>(*this);
+                ar & bouncesLeft;
+            }
+
+        protected:
+            BouncyTrailedRocket();
+
+        public:
+            static const int MAX_BOUNCES = 4;
+
+            int bouncesLeft = MAX_BOUNCES;
+
+            static std::shared_ptr<BouncyTrailedRocket> create();
+
+            virtual void onHit(TankMatch *match) override;
+            
+            void finish(TankMatch *match);
+        };
 
 
         class RocketTrail : public Entity {
@@ -522,9 +551,9 @@ namespace Hilltop {
             ParticleBomb();
 
         public:
-            static const int TRIGGER_DISTANCE_X = 50;
-            static const int TRIGGER_DISTANCE_Y = 12;
-            static const int STEPS = 36;
+            static const int TRIGGER_DISTANCE_X = 40;
+            static const int TRIGGER_DISTANCE_Y = 8;
+            static const int STEPS = 18;
 
             static std::shared_ptr<ParticleBomb> create();
 
@@ -613,6 +642,22 @@ namespace Hilltop {
         inline void load_construct_data(Archive &ar, DirtRocketWeapon *t, const unsigned int) {
             ::new(t) DirtRocketWeapon(0);
         }
+        
+
+        class BouncyRocketWeapon : public RocketWeapon {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<RocketWeapon>(*this);
+            }
+
+        protected:
+            virtual std::shared_ptr<Entity> createRocket(Vector2 position, Vector2 direction) override;
+
+        public:
+            BouncyRocketWeapon();
+        };
 
 
         class ParticleBombWeapon : public Weapon {
@@ -642,6 +687,7 @@ namespace Hilltop {
                 ar & botTargetAngle;
                 ar & botTargetPower;
                 ar & botStepsDone;
+                ar & botDifficulty;
                 ar & botLastStepTick;
                 ar & tank;
                 ar & team;
@@ -659,7 +705,7 @@ namespace Hilltop {
             static const int BOT_ATTEMPT_SPEED = 5;
             static const int BOT_MAX_ATTEMPT_TIME = 80;
             static constexpr int RANDOM_ATTEMPTS_BY_BOT_DIFFICULTY[] = {
-                10, 30, 80
+                5, 20, 80
             };
             static const int BOT_STEPS = 6;
             static const int BOT_TICKS_BETWEEN_STEPS = 4;
@@ -670,6 +716,7 @@ namespace Hilltop {
             int botTargetPower = -1;
             int botStepsDone;
             int botLastStepTick;
+            int botDifficulty;
 
             std::shared_ptr<Tank> tank;
             int team = 1;
