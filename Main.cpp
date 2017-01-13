@@ -38,6 +38,7 @@ BOOST_CLASS_EXPORT(Hilltop::Game::ArmorDrop)
 BOOST_CLASS_EXPORT(Hilltop::Game::WeaponDrop)
 BOOST_CLASS_EXPORT(Hilltop::Game::ParticleBomb)
 BOOST_CLASS_EXPORT(Hilltop::Game::BulletRainCloud)
+BOOST_CLASS_EXPORT(Hilltop::Game::Minigun)
 
 BOOST_CLASS_EXPORT(Hilltop::Game::Weapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::RocketWeapon)
@@ -46,6 +47,7 @@ BOOST_CLASS_EXPORT(Hilltop::Game::GroundRocketWeapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::BouncyRocketWeapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::ParticleBombWeapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::BulletRainWeapon)
+BOOST_CLASS_EXPORT(Hilltop::Game::MinigunWeapon)
 
 
 #define GAME_TICKS_PER_SEC 20
@@ -687,9 +689,11 @@ static bool weaponAreaAction(Form::event_args_t e) {
     }
 
     std::shared_ptr<TankController> player = match->players[match->currentPlayer];
-    player->currentWeapon = (player->currentWeapon + delta) % player->weapons.size();
+    player->currentWeapon = player->currentWeapon + delta;
     if (player->currentWeapon < 0)
         player->currentWeapon += (int)player->weapons.size();
+    else
+        player->currentWeapon %= (int)player->weapons.size();
 
     return delta != 0;
 }
@@ -710,8 +714,17 @@ static void drawWeaponEntry(BufferedConsole &console, Weapon &weapon, int num, b
     ConsoleColor numC = active ? DARK_GRAY : GRAY;
     printText(sub.get(), 0, 6, sub->width - 8, 1, numText.str(), numC, RIGHT);
 
-    sub->set(0, 2, weapon.icon[0].ch, weapon.icon[0].color);
-    sub->set(0, 3, weapon.icon[1].ch, weapon.icon[1].color);
+    ConsoleColor icon = RED;
+    if (num > 1)
+        icon = ORANGE;
+    if (num > 2)
+        icon = GREEN;
+    if (num >= TankMatch::UNLIMITED_WEAPON_THRESHOLD)
+        icon = WHITE;
+    icon = make_bg_color(icon);
+
+    for (int i = 0; i < 2; i++)
+        sub->set(0, 2 + i, L' ', icon);
 }
 
 static bool shadowPixel(BufferedConsole &console, unsigned short x, unsigned short y, ConsoleColor from,

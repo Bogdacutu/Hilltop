@@ -608,6 +608,30 @@ namespace Hilltop {
         };
 
 
+        class Minigun : public Entity {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Entity>(*this);
+                ar & tank;
+            }
+
+        protected:
+            Minigun();
+
+        public:
+            static const int MINIGUN_TICKS = 32;
+            static const int ANGLE_OFFSET = 3;
+
+            std::shared_ptr<Tank> tank;
+
+            static std::shared_ptr<Minigun> create();
+
+            virtual void onTick(TankMatch *match) override;
+        };
+
+
 
         class Weapon {
         private:
@@ -615,15 +639,12 @@ namespace Hilltop {
             template<class Archive>
             void serialize(Archive &ar, const unsigned int version) {
                 ar & name;
-                ar & icon;
             }
 
         public:
             static const std::string INVALID_NAME;
 
             std::string name = INVALID_NAME;
-
-            Console::BufferedConsole::pixel_t icon[2];
 
             virtual void fire(TankMatch &match, int playerNumber);
         };
@@ -784,6 +805,21 @@ namespace Hilltop {
             static const int TRACER_OFFSET = TRACER_INTERVAL * 3;
 
             TracerWeapon();
+
+            virtual void fire(TankMatch &match, int playerNumber) override;
+        };
+
+
+        class MinigunWeapon : public Weapon {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Weapon>(*this);
+            }
+
+        public:
+            MinigunWeapon();
 
             virtual void fire(TankMatch &match, int playerNumber) override;
         };

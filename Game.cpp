@@ -912,6 +912,35 @@ void Hilltop::Game::BulletRainCloud::onHit(TankMatch *match) {
 
 
 //
+// Minigun
+//
+
+Hilltop::Game::Minigun::Minigun() : Entity() {
+    position = Vector2(0, 0);
+    direction = Vector2(0, 0);
+    gravityMult = 0;
+    maxEntityAge = MINIGUN_TICKS;
+}
+
+std::shared_ptr<Minigun> Hilltop::Game::Minigun::create() {
+    return std::shared_ptr<Minigun>(new Minigun());
+}
+
+void Hilltop::Game::Minigun::onTick(TankMatch *match) {
+    Entity::onTick(match);
+
+    int offset = scale(rand(), 0, RAND_MAX, -ANGLE_OFFSET - 1, ANGLE_OFFSET);
+    std::shared_ptr<SimpleRocket> rocket = SimpleRocket::create(YELLOW);
+    rocket->explosionSize = 3;
+    rocket->position = tank->getBarrelBase() + Tank::getProjectileBase(tank->angle + offset);
+    rocket->direction = Tank::calcTrajectory(tank->angle + offset, tank->power);
+    rocket->explosionDamage = 0.3f;
+    match->addEntity(*rocket);
+}
+
+
+
+//
 // Weapon
 //
 
@@ -1051,6 +1080,20 @@ void Hilltop::Game::TracerWeapon::fire(TankMatch &match, int playerNumber) {
         tracer->text = text.str();
         match.addEntity(*tracer);
     }
+}
+
+
+
+//
+// MinigunWeapon
+//
+
+Hilltop::Game::MinigunWeapon::MinigunWeapon() : Weapon() {}
+
+void Hilltop::Game::MinigunWeapon::fire(TankMatch &match, int playerNumber) {
+    std::shared_ptr<Minigun> minigun = Minigun::create();
+    minigun->tank = match.players[playerNumber]->tank;
+    match.addEntity(*minigun);
 }
 
 
@@ -1379,6 +1422,12 @@ void Hilltop::Game::TankMatch::initalizeWeapons() {
     {
         std::shared_ptr<BulletRainWeapon> weapon = std::make_shared<BulletRainWeapon>();
         weapon->name = "Bullet Rain";
+        weapons.push_back(weapon);
+    }
+
+    {
+        std::shared_ptr<MinigunWeapon> weapon = std::make_shared<MinigunWeapon>();
+        weapon->name = "Minigun";
         weapons.push_back(weapon);
     }
 
