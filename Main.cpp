@@ -1185,13 +1185,13 @@ const char *TANK_ATTRIBUTE_NAMES[] = {
 };
 
 enum MapType {
-    MAP_FLAT,
+    MAP_RANDOM,
     MAP_HILLSIDE,
     MAP_HILLTOP
 };
 
 const char *MAP_TYPE_NAMES[] = {
-    "Flat",
+    "Random",
     "Hillside",
     "Hilltop"
 };
@@ -1210,7 +1210,7 @@ struct {
         int team;
         int tank[NUM_TANK_ATTRIBUTES];
     } players[4];
-    MapType mapType = MAP_HILLTOP;
+    MapType mapType = MAP_HILLSIDE;
     TankMatch::FiringMode firingMode = TankMatch::FIRE_AS_TEAM;
 } newGameSettings;
 
@@ -1534,9 +1534,24 @@ static bool startGameAction(Form::event_args_t e) {
             invert = [](float x)->float { return 1.0f - x; };
 
         switch (newGameSettings.mapType) {
-        case MAP_FLAT:
-            match->buildMap([](float x)->float { return 0.5f; });
+        case MAP_RANDOM: {
+            float f[4];
+            for (int i = 0; i < 4; i++)
+                f[i] = scale((float)rand(), 0, RAND_MAX, 1.0f, 10.0f);
+            float a[4];
+            for (int i = 0; i < 4; i++)
+                a[i] = scale((float)rand(), 0, RAND_MAX, -1 / f[i], 1 / f[i]);
+            float o[4];
+            for (int i = 0; i < 4; i++)
+                o[i] = scale((float)rand(), 0, RAND_MAX, 0.0f, 6.28f);
+            match->buildMap([invert, &f, &a, &o](float x)->float {
+                float ret = 0;
+                for (int i = 0; i < 4; i++)
+                    ret += a[i] * std::sinf(f[i] * invert(x) + o[i]);
+                return 0.5f + ret;
+            });
             break;
+        }
         case MAP_HILLSIDE:
             match->buildMap([invert](float x)->float {
                 return (std::sinf(invert(x) * 2 - 1.4f) + 1.0f) / 2.0f + 0.1f;
