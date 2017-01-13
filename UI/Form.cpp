@@ -1,145 +1,10 @@
-﻿#include "UI.h"
-#include <algorithm>
-#include <Windows.h>
-
-using namespace Hilltop::Console;
-using namespace Hilltop::UI;
+﻿#include "UI/Form.h"
 
 
+namespace Hilltop {
+namespace UI {
 
-//
-// Element
-//
-
-Hilltop::UI::Element::Element() {}
-
-void Hilltop::UI::Element::handleDraw(Console::BufferedConsoleRegion &region) const {}
-
-Hilltop::UI::Element::~Element() {}
-
-std::shared_ptr<Element> Hilltop::UI::Element::create() {
-    return std::shared_ptr<Element>(new Element());
-}
-
-void Hilltop::UI::Element::draw(Console::BufferedConsole &console) const {
-    std::shared_ptr<BufferedConsoleRegion> region =
-        BufferedConsoleRegion::create(console, width, height, x, y);
-    handleDraw(*region);
-}
-
-
-
-//
-// ElementCollection
-//
-
-Hilltop::UI::ElementCollection::ElementCollection() : Element() {}
-
-void Hilltop::UI::ElementCollection::handleDraw(Console::BufferedConsoleRegion &region) const {
-    Element::handleDraw(region);
-
-    if (drawBackground)
-        region.clear(backgroundColor);
-
-    for (const std::shared_ptr<Element> &el : children)
-        el->draw(region);
-}
-
-const std::vector<std::shared_ptr<Element>> &Hilltop::UI::ElementCollection::getChildren() const {
-    return children;
-}
-
-void Hilltop::UI::ElementCollection::addChild(Element &element) {
-    children.push_back(element.shared_from_this());
-}
-
-void Hilltop::UI::ElementCollection::removeChild(Element &element) {
-    std::shared_ptr<Element> el = element.shared_from_this();
-    std::vector<std::shared_ptr<Element>>::iterator it = std::find(children.begin(), children.end(), el);
-    if (it != children.end())
-        children.erase(it);
-}
-
-std::shared_ptr<ElementCollection> Hilltop::UI::ElementCollection::create() {
-    return std::shared_ptr<ElementCollection>(new ElementCollection());
-}
-
-
-
-//
-// TextBox
-//
-
-Hilltop::UI::TextBox::TextBox() : Element() {}
-
-void Hilltop::UI::TextBox::handleDraw(Console::BufferedConsoleRegion &region) const {
-    Element::handleDraw(region);
-
-    TextBoxSize size = printText(nullptr, 0, 0, width, height, text, color, alignment, wordWrap);
-    printText(&region, (height - size.lines) / 2, 0, width, height, text, color, alignment, wordWrap);
-}
-
-std::shared_ptr<TextBox> Hilltop::UI::TextBox::create() {
-    return std::shared_ptr<TextBox>(new TextBox());
-}
-
-
-
-//
-// Button
-//
-
-Hilltop::UI::Button::Button() : TextBox() {
-    alignment = CENTER;
-}
-
-void Hilltop::UI::Button::handleDraw(Console::BufferedConsoleRegion &region) const {
-    region.clear(backgroundColor);
-
-    TextBox::handleDraw(region);
-}
-
-std::shared_ptr<Button> Hilltop::UI::Button::create() {
-    return std::shared_ptr<Button>(new Button());
-}
-
-
-
-//
-// ProgressBar
-//
-
-Hilltop::UI::ProgressBar::ProgressBar() : Element() {}
-
-void Hilltop::UI::ProgressBar::handleDraw(Console::BufferedConsoleRegion &region) const {
-    ConsoleColor c = make_bg_color(color);
-
-    float v = value;
-    if (inverted)
-        v = 1 - v;
-    int start = 0;
-    int end = width;
-    if (!inverted)
-        end = (int)(end * value);
-    else
-        start = end - (int)(width * value);
-
-    for (int i = start; i < end; i++)
-        for (int j = 0; j < height; j++)
-            region.set(j, i, L' ', c, BACKGROUND_COLOR);
-}
-
-std::shared_ptr<ProgressBar> Hilltop::UI::ProgressBar::create() {
-    return std::shared_ptr<ProgressBar>(new ProgressBar());
-}
-
-
-
-//
-// Form
-//
-
-bool Hilltop::UI::Form::findBounds(std::shared_ptr<const Element> needle,
+bool Form::findBounds(std::shared_ptr<const Element> needle,
     std::shared_ptr<const Element> haystack, unsigned short *x, unsigned short *y) {
     if (needle == haystack) {
         *x = needle->x;
@@ -162,38 +27,38 @@ bool Hilltop::UI::Form::findBounds(std::shared_ptr<const Element> needle,
     return false;
 }
 
-static void drawThinRectangle(BufferedConsole &console, unsigned short width, unsigned short height,
-    unsigned short x, unsigned short y, ConsoleColor color) {
-    ConsoleColor c = make_bg_color(color);
+static void drawThinRectangle(Console::BufferedConsole &console, unsigned short width, unsigned short height,
+    unsigned short x, unsigned short y, Console::ConsoleColor color) {
+    Console::ConsoleColor c = make_bg_color(color);
 
     for (int i = 0; i < width; i++)
-        console.set(x, y + i, L'▄', color, FOREGROUND_COLOR);
+        console.set(x, y + i, L'▄', color, Console::FOREGROUND_COLOR);
     for (int i = 1; i < height - 1; i++) {
         console.set(x + i, y, L' ', c);
         console.set(x + i, y + width - 1, L' ', c);
     }
     for (int i = 0; i < width; i++)
-        console.set(x + height - 1, y + i, L'▀', color, FOREGROUND_COLOR);
+        console.set(x + height - 1, y + i, L'▀', color, Console::FOREGROUND_COLOR);
 }
 
-static void drawThinOuterRectangle(BufferedConsole &console, unsigned short width, unsigned short height,
-    unsigned short x, unsigned short y, ConsoleColor color) {
-    ConsoleColor c = make_bg_color(color);
+static void drawThinOuterRectangle(Console::BufferedConsole &console, unsigned short width, unsigned short height,
+    unsigned short x, unsigned short y, Console::ConsoleColor color) {
+    Console::ConsoleColor c = make_bg_color(color);
 
     for (int i = 1; i < width - 1; i++)
-        console.set(x, y + i, L'▀', color, FOREGROUND_COLOR);
+        console.set(x, y + i, L'▀', color, Console::FOREGROUND_COLOR);
     for (int i = 0; i < height; i++) {
         console.set(x + i, y, L' ', c);
         console.set(x + i, y + width - 1, L' ', c);
     }
     for (int i = 1; i < width - 1; i++)
-        console.set(x + height - 1, y + i, L'▄', color, FOREGROUND_COLOR);
+        console.set(x + height - 1, y + i, L'▄', color, Console::FOREGROUND_COLOR);
 }
 
-Hilltop::UI::Form::Form(int numElements)
+Form::Form(int numElements)
     : mapping(numElements), actions(numElements), elements(numElements) {}
 
-bool Hilltop::UI::Form::doAction(KEY_EVENT_RECORD record) {
+bool Form::doAction(KEY_EVENT_RECORD record) {
     event_args_t args(this);
 
     args.type = KEY;
@@ -206,7 +71,7 @@ bool Hilltop::UI::Form::doAction(KEY_EVENT_RECORD record) {
     return false;
 }
 
-bool Hilltop::UI::Form::doAction(bool focused) {
+bool Form::doAction(bool focused) {
     event_args_t args(this);
 
     args.type = focused ? FOCUS : BLUR;
@@ -218,7 +83,7 @@ bool Hilltop::UI::Form::doAction(bool focused) {
     return false;
 }
 
-bool Hilltop::UI::Form::doDefaultAction(KEY_EVENT_RECORD record, std::function<void(event_args_t)> action) {
+bool Form::doDefaultAction(KEY_EVENT_RECORD record, std::function<void(event_args_t)> action) {
     event_args_t args;
 
     args.type = KEY;
@@ -232,7 +97,7 @@ bool Hilltop::UI::Form::doDefaultAction(KEY_EVENT_RECORD record, std::function<v
     return false;
 }
 
-void Hilltop::UI::Form::doDirectionSwitch(KEY_EVENT_RECORD record, Direction direction) {
+void Form::doDirectionSwitch(KEY_EVENT_RECORD record, Direction direction) {
     int destination = NO_ACTION;
     switch (direction) {
     case UP:
@@ -258,14 +123,14 @@ void Hilltop::UI::Form::doDirectionSwitch(KEY_EVENT_RECORD record, Direction dir
     }
 }
 
-void Hilltop::UI::Form::switchCurrent(int destination) {
+void Form::switchCurrent(int destination) {
     if (observer)
         observer(currentPos, destination);
 
     currentPos = destination;
 }
 
-void Hilltop::UI::Form::handleKeyEvent(bool active, KEY_EVENT_RECORD record,
+void Form::handleKeyEvent(bool active, KEY_EVENT_RECORD record,
     std::function<void(event_args_t)> defaultAction) {
     if (!record.bKeyDown)
         return;
@@ -316,7 +181,7 @@ void Hilltop::UI::Form::handleKeyEvent(bool active, KEY_EVENT_RECORD record,
     }
 }
 
-void Hilltop::UI::Form::tick(bool active, std::function<void(event_args_t)> defaultAction) {
+void Form::tick(bool active, std::function<void(event_args_t)> defaultAction) {
     tickCounter++;
 
     HANDLE handle = GetStdHandle(STD_INPUT_HANDLE);
@@ -337,22 +202,23 @@ void Hilltop::UI::Form::tick(bool active, std::function<void(event_args_t)> defa
     }
 }
 
-void Hilltop::UI::Form::draw(Console::BufferedConsole &console, ElementCollection &col) {
+void Form::draw(Console::BufferedConsole &console, ElementCollection &col) {
     unsigned short x = 0;
     unsigned short y = 0;
     if (findBounds(elements[currentPos], col.shared_from_this(), &x, &y)) {
         if (isFocused) {
             drawThinRectangle(console, elements[currentPos]->width + 2,
-                elements[currentPos]->height + 2, x - 1, y - 1, WHITE);
+                elements[currentPos]->height + 2, x - 1, y - 1, Console::WHITE);
         } else {
-            ConsoleColor c = tickCounter % (BLINK_TICKS * 2) < BLINK_TICKS ? GRAY : DARK_GRAY;
+            Console::ConsoleColor c = tickCounter % (BLINK_TICKS * 2) < BLINK_TICKS ?
+                Console::GRAY : Console::DARK_GRAY;
             drawThinOuterRectangle(console, elements[currentPos]->width + 4,
                 elements[currentPos]->height + 2, x - 1, y - 2, c);
         }
     }
 }
 
-void Hilltop::UI::Form::configureSimpleForm(Form &form) {
+void Form::configureSimpleForm(Form &form) {
     for (int i = 0; i < form.elements.size(); i++) {
         if (i > 0)
             form.mapping[i].left = form.mapping[i].top = i - 1;
@@ -361,7 +227,7 @@ void Hilltop::UI::Form::configureSimpleForm(Form &form) {
     }
 }
 
-void Hilltop::UI::Form::configureMatrixForm(Form &form, int lines, int cols) {
+void Form::configureMatrixForm(Form &form, int lines, int cols) {
     for (int i = 0; i < lines; i++) {
         const unsigned int idx = i * cols;
         if (i > 0)
@@ -375,4 +241,7 @@ void Hilltop::UI::Form::configureMatrixForm(Form &form, int lines, int cols) {
         for (int j = 0; j < cols - 1; j++)
             form.mapping[idx + j].right = idx + j + 1;
     }
+}
+
+}
 }

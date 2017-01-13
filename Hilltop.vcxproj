@@ -167,7 +167,12 @@
     <ClCompile Include="Console\Windows\WindowsConsole.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="UI.cpp" />
+    <ClCompile Include="UI\Button.cpp" />
+    <ClCompile Include="UI\Element.cpp" />
+    <ClCompile Include="UI\ElementCollection.cpp" />
+    <ClCompile Include="UI\Form.cpp" />
+    <ClCompile Include="UI\ProgressBar.cpp" />
+    <ClCompile Include="UI\TextBox.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Console.h" />
@@ -183,6 +188,12 @@
     <ClInclude Include="Console\Windows\WindowsConsole.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="UI.h" />
+    <ClInclude Include="UI\Button.h" />
+    <ClInclude Include="UI\Element.h" />
+    <ClInclude Include="UI\ElementCollection.h" />
+    <ClInclude Include="UI\Form.h" />
+    <ClInclude Include="UI\ProgressBar.h" />
+    <ClInclude Include="UI\TextBox.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="console.reg" />
