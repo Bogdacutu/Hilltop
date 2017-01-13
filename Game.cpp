@@ -1,6 +1,7 @@
 ﻿#include "Game.h"
 #include "Console.h"
 #include <algorithm>
+#include <sstream>
 
 #pragma warning(disable: 4244)
 
@@ -9,6 +10,10 @@ using namespace Hilltop::Game;
 
 
 const static float PI = std::atanf(1) * 4;
+
+
+void messageBox(std::string text, std::string title = "");
+
 
 
 float Hilltop::Game::scale(float value, float fromLow, float fromHigh, float toLow, float toHigh) {
@@ -94,6 +99,12 @@ void Hilltop::Game::BotAttempt::onDraw(TankMatch *match, Console::DoublePixelBuf
 
     Vector2 p = position.round();
     console.set(p.X, p.Y, color);
+    if (color == GREEN) {
+        console.set(p.X - 1, p.Y, color);
+        console.set(p.X + 1, p.Y, color);
+        console.set(p.X, p.Y - 1, color);
+        console.set(p.X, p.Y + 1, color);
+    }
 }
 
 
@@ -210,7 +221,7 @@ void Hilltop::Game::Explosion::createLand(TankMatch *match) {
 }
 
 int Hilltop::Game::Explosion::calcDamage(Vector2 point) {
-    return scale(distance(position.round(), point), 0, size, 8 * size, 1);
+    return scale(distance(position.round(), point), 0, size, 8 * size, 1) * damageMult;
 }
 
 void Hilltop::Game::Explosion::hitTanks(TankMatch *match) {
@@ -705,6 +716,51 @@ void Hilltop::Game::WeaponDrop::handleTank(TankMatch *match, Tank &tank) {
 
 
 //
+// ParticleBomb
+//
+
+Hilltop::Game::ParticleBomb::ParticleBomb() : SimpleTrailedRocket(YELLOW, DARK_GRAY, 1) {
+    explosionSize = 1;
+    destroyLand = false;
+}
+
+std::shared_ptr<ParticleBomb> Hilltop::Game::ParticleBomb::create() {
+    return std::shared_ptr<ParticleBomb>(new ParticleBomb());
+}
+
+void Hilltop::Game::ParticleBomb::onTick(TankMatch *match) {
+    SimpleTrailedRocket::onTick(match);
+
+    for (int i = 0; i < match->players.size(); i++) {
+        if (match->players[i]->team != team) {
+            std::shared_ptr<Tank> tank = match->players[i]->tank;
+            if (std::abs(position.X - tank->getBarrelBase().X) < TRIGGER_DISTANCE_X &&
+                std::abs(position.Y - tank->getBarrelBase().Y) < TRIGGER_DISTANCE_Y) {
+                onHit(match);
+                break;
+            }
+        }
+    }
+}
+
+void Hilltop::Game::ParticleBomb::onHit(TankMatch *match) {
+    SimpleTrailedRocket::onHit(match);
+
+    for (int i = 0; i < STEPS; i++) {
+        int angle = 360 / STEPS * i;
+        std::shared_ptr<SimpleTrailedRocket> rocket = SimpleTrailedRocket::create(WHITE, DARK_GRAY, 3);
+        rocket->position = position.round();
+        rocket->direction = Tank::calcTrajectory(angle, 10);
+        rocket->explosionSize = 3;
+        rocket->explosionDamage = 0.15f;
+        match->addEntity(*rocket);
+    }
+    match->removeEntity(*this);
+}
+
+
+
+//
 // Weapon
 //
 
@@ -718,11 +774,12 @@ void Hilltop::Game::Weapon::fire(TankMatch &match, int playerNumber) {}
 // RocketWeapon
 //
 
-std::shared_ptr<SimpleRocket> Hilltop::Game::RocketWeapon::createRocket(Vector2 position,
+std::shared_ptr<Entity> Hilltop::Game::RocketWeapon::createRocket(Vector2 position,
     Vector2 direction) {
     std::shared_ptr<SimpleRocket> rocket = SimpleTrailedRocket::create(WHITE, DARK_GRAY, 3);
     rocket->position = position;
     rocket->direction = direction;
+    rocket->explosionSize = explosionSize;
     return rocket;
 }
 
@@ -732,8 +789,13 @@ void Hilltop::Game::RocketWeapon::fire(TankMatch &match, int playerNumber) {
     Weapon::fire(match, playerNumber);
 
     std::shared_ptr<Tank> tank = match.players[playerNumber]->tank;
-    std::shared_ptr<Entity> rocket = createRocket(tank->getProjectileBase(), tank->calcTrajectory());
-    match.addEntity(*rocket);
+    int start = tank->angle - ((numRockets - 1) * 2) / 2;
+    
+    for (int i = 0; i < numRockets; i++) {
+        Vector2 direction = tank->calcTrajectory(start + i * 2, tank->power);
+        std::shared_ptr<Entity> rocket = createRocket(tank->getProjectileBase(), direction);
+        match.addEntity(*rocket);
+    }
 }
 
 
@@ -742,15 +804,34 @@ void Hilltop::Game::RocketWeapon::fire(TankMatch &match, int playerNumber) {
 // DirtRocketWeapon
 //
 
-std::shared_ptr<SimpleRocket> Hilltop::Game::DirtRocketWeapon::createRocket(Vector2 position,
+std::shared_ptr<Entity> Hilltop::Game::DirtRocketWeapon::createRocket(Vector2 position,
     Vector2 direction) {
-    std::shared_ptr<SimpleRocket> rocket = RocketWeapon::createRocket(position, direction);
+    std::shared_ptr<SimpleRocket> rocket =
+        std::dynamic_pointer_cast<SimpleRocket>(RocketWeapon::createRocket(position, direction));
     rocket->destroyLand = false;
     rocket->createLand = true;
+    rocket->explosionSize = explosionSize;
     return rocket;
 }
 
 Hilltop::Game::DirtRocketWeapon::DirtRocketWeapon(int numRockets) : RocketWeapon(numRockets) {}
+
+
+
+//
+// ParticleBombWeapon
+//
+
+Hilltop::Game::ParticleBombWeapon::ParticleBombWeapon() : Weapon() {}
+
+void Hilltop::Game::ParticleBombWeapon::fire(TankMatch &match, int playerNumber) {
+    std::shared_ptr<Tank> tank = match.players[playerNumber]->tank;
+    std::shared_ptr<ParticleBomb> bomb = ParticleBomb::create();
+    bomb->position = tank->getProjectileBase();
+    bomb->direction = tank->calcTrajectory();
+    bomb->team = match.players[playerNumber]->team;
+    match.addEntity(*bomb);
+}
 
 
 
@@ -837,8 +918,9 @@ bool Hilltop::Game::TankController::applyAI(TankMatch *match, TankController &pl
                     attempt->power = power;
                     attempt->position = player.tank->getProjectileBase();
                     attempt->direction = Tank::calcTrajectory(player.tank->angle, power);
-                    attempt->physicsSpeed = BOT_ATTEMPT_SPEED;
-                    attempt->maxEntityAge = BOT_MAX_ATTEMPT_TIME;
+                    attempt->physicsSpeed = BotAttempt::enableDebug ? 1 : BOT_ATTEMPT_SPEED;
+                    attempt->maxEntityAge = BOT_MAX_ATTEMPT_TIME *
+                        (BotAttempt::enableDebug ? BOT_ATTEMPT_SPEED : 1);
                     player.botAttempts.push_back(attempt);
                     match->addEntity(*attempt);
                 }
@@ -853,8 +935,9 @@ bool Hilltop::Game::TankController::applyAI(TankMatch *match, TankController &pl
                 attempt->power = power;
                 attempt->position = player.tank->getBarrelBase() + Tank::getProjectileBase(angle);
                 attempt->direction = Tank::calcTrajectory(angle, power);
-                attempt->physicsSpeed = BOT_ATTEMPT_SPEED;
-                attempt->maxEntityAge = BOT_MAX_ATTEMPT_TIME;
+                attempt->physicsSpeed = BotAttempt::enableDebug ? 1 : BOT_ATTEMPT_SPEED;
+                attempt->maxEntityAge = BOT_MAX_ATTEMPT_TIME *
+                    (BotAttempt::enableDebug ? BOT_ATTEMPT_SPEED : 1);
                 player.botAttempts.push_back(attempt);
                 match->addEntity(*attempt);
             }
@@ -1028,8 +1111,28 @@ void Hilltop::Game::TankMatch::initalizeWeapons() {
     }
 
     {
+        std::shared_ptr<RocketWeapon> weapon = std::make_shared<RocketWeapon>(3);
+        weapon->name = "Triple Missile";
+        weapon->explosionSize = 4;
+        weapons.push_back(weapon);
+    }
+
+    {
+        std::shared_ptr<RocketWeapon> weapon = std::make_shared<RocketWeapon>(5);
+        weapon->name = "Five Missiles";
+        weapon->explosionSize = 4;
+        weapons.push_back(weapon);
+    }
+
+    {
         std::shared_ptr<DirtRocketWeapon> weapon = std::make_shared<DirtRocketWeapon>(1);
-        weapon->name = "Dirty Missile";
+        weapon->name = "Dirt Missile";
+        weapons.push_back(weapon);
+    }
+
+    {
+        std::shared_ptr<ParticleBombWeapon> weapon = std::make_shared<ParticleBombWeapon>();
+        weapon->name = "Particle Bomb";
         weapons.push_back(weapon);
     }
 
@@ -1245,8 +1348,8 @@ int Hilltop::Game::TankMatch::getNextPlayer() {
     int currentTeam = players[currentPlayer]->team;
     int minTeam = currentTeam;
     int maxTeam = currentTeam;
-    int minAliveTeam = currentTeam;
-    int maxAliveTeam = currentTeam;
+    int minAliveTeam = -1;
+    int maxAliveTeam = -1;
     
     for (int i = 0; i < players.size(); i++) {
         int team = players[i]->team;
@@ -1255,7 +1358,7 @@ int Hilltop::Game::TankMatch::getNextPlayer() {
         if (team > maxTeam)
             maxTeam = team;
         if (players[i]->tank->alive) {
-            if (team < minAliveTeam)
+            if (team < minAliveTeam || minAliveTeam == -1)
                 minAliveTeam = team;
             if (team > maxAliveTeam)
                 maxAliveTeam = team;

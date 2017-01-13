@@ -34,10 +34,12 @@ BOOST_CLASS_EXPORT(Hilltop::Game::Drop)
 BOOST_CLASS_EXPORT(Hilltop::Game::HealthDrop)
 BOOST_CLASS_EXPORT(Hilltop::Game::ArmorDrop)
 BOOST_CLASS_EXPORT(Hilltop::Game::WeaponDrop)
+BOOST_CLASS_EXPORT(Hilltop::Game::ParticleBomb)
 
 BOOST_CLASS_EXPORT(Hilltop::Game::Weapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::RocketWeapon)
 BOOST_CLASS_EXPORT(Hilltop::Game::DirtRocketWeapon)
+BOOST_CLASS_EXPORT(Hilltop::Game::ParticleBombWeapon)
 
 
 #define GAME_TICKS_PER_SEC 20
@@ -1112,17 +1114,17 @@ enum NewGameArea {
 };
 
 enum PlayerTeam {
-    TEAM_BLUE = 1,
-    TEAM_GREEN = 2,
-    TEAM_RED = 3,
+    TEAM_RED = 1,
+    TEAM_BLUE = 2,
+    TEAM_GREEN = 3,
     TEAM_YELLOW = 4,
 };
 
 const char *PLAYER_TEAM_NAMES[] = {
     "invalid",
+    "Red",
     "Blue",
     "Green",
-    "Red",
     "Yellow"
 };
 

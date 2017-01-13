@@ -163,6 +163,7 @@ namespace Hilltop {
                 ar & boost::serialization::base_object<Entity>(*this);
                 ar & color;
                 ar & explosionSize;
+                ar & explosionDamage;
                 ar & destroyLand;
                 ar & createLand;
             }
@@ -174,6 +175,7 @@ namespace Hilltop {
             ConsoleColor color;
 
             int explosionSize = 5;
+            float explosionDamage = 1.0f;
 
             bool destroyLand = true;
             bool createLand = false;
@@ -260,6 +262,7 @@ namespace Hilltop {
             void serialize(Archive &ar, const unsigned int version) {
                 ar & boost::serialization::base_object<Entity>(*this);
                 ar & coreSize;
+                ar & damageMult;
                 ar & tanksHit;
             }
 
@@ -274,6 +277,7 @@ namespace Hilltop {
         public:
             const int size;
             int coreSize;
+            float damageMult = 1.0f;
 
             bool willDestroyLand = false;
             bool willCreateLand = false;
@@ -504,6 +508,32 @@ namespace Hilltop {
             virtual void handleTank(TankMatch *match, Tank &tank) override;
         };
 
+        
+        class ParticleBomb : public SimpleTrailedRocket {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<SimpleTrailedRocket>(*this);
+                ar & team;
+            }
+
+        protected:
+            ParticleBomb();
+
+        public:
+            static const int TRIGGER_DISTANCE_X = 50;
+            static const int TRIGGER_DISTANCE_Y = 12;
+            static const int STEPS = 36;
+
+            static std::shared_ptr<ParticleBomb> create();
+
+            int team = -1;
+
+            virtual void onTick(TankMatch *match) override;
+            virtual void onHit(TankMatch *match) override;
+        };
+
 
 
         class Weapon {
@@ -534,15 +564,17 @@ namespace Hilltop {
             template<class Archive>
             void serialize(Archive &ar, const unsigned int version) {
                 ar & boost::serialization::base_object<Weapon>(*this);
+                ar & explosionSize;
             }
 
         protected:
-            virtual std::shared_ptr<SimpleRocket> createRocket(Vector2 position, Vector2 direction);
+            virtual std::shared_ptr<Entity> createRocket(Vector2 position, Vector2 direction);
             
         public:
             RocketWeapon(int numRockets);
 
             const int numRockets;
+            int explosionSize = 5;
 
             virtual void fire(TankMatch &match, int playerNumber) override;
         };
@@ -571,7 +603,7 @@ namespace Hilltop {
             }
 
         protected:
-            virtual std::shared_ptr<SimpleRocket> createRocket(Vector2 position, Vector2 direction) override;
+            virtual std::shared_ptr<Entity> createRocket(Vector2 position, Vector2 direction) override;
 
         public:
             DirtRocketWeapon(int numRockets);
@@ -581,6 +613,21 @@ namespace Hilltop {
         inline void load_construct_data(Archive &ar, DirtRocketWeapon *t, const unsigned int) {
             ::new(t) DirtRocketWeapon(0);
         }
+
+
+        class ParticleBombWeapon : public Weapon {
+        private:
+            friend class boost::serialization::access;
+            template<class Archive>
+            void serialize(Archive &ar, const unsigned int version) {
+                ar & boost::serialization::base_object<Weapon>(*this);
+            }
+
+        public:
+            ParticleBombWeapon();
+
+            virtual void fire(TankMatch &match, int playerNumber) override;
+        };
 
 
 
